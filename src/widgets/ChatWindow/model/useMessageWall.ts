@@ -118,18 +118,32 @@ export const useMessageWall = ({ chatId, messages, isLoading, isLoadingOlder, ha
     if (event.deltaY < 0) stickToBottom.current = false;
   }, []);
 
-  const registerSentinel = useCallback((element: HTMLDivElement | null) => {
-    sentinelRef.current = element;
-  }, []);
+  const bubbleCallbacks = useRef(new Map<number, (element: HTMLDivElement | null) => void>());
+  useEffect(() => { bubbleCallbacks.current.clear(); }, [chatId]);
 
-  const registerBubble = useCallback((index: number, timestamp?: number) => (element: HTMLDivElement | null) => {
-    bubbleRefs.current[index] = element;
-    bubbleTimestamps.current[index] = timestamp;
+  const registerBubble = useCallback((index: number, timestamp?: number) => {
+    const existing = bubbleCallbacks.current.get(index);
+    if (existing) return existing;
+    const callback = (element: HTMLDivElement | null) => {
+      bubbleRefs.current[index] = element;
+      bubbleTimestamps.current[index] = timestamp;
+    };
+    bubbleCallbacks.current.set(index, callback);
+    return callback;
   }, []);
 
   const scrollToIndex = useCallback((index: number) => {
     bubbleRefs.current[index]?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, []);
+
+  const captureAnchor = useCallback(() => {
+    const list = listElement.current;
+    if (list) olderAnchor.current = { scrollHeight: list.scrollHeight, scrollTop: list.scrollTop };
+  }, []);
+
+  const leaveBottom = useCallback(() => { stickToBottom.current = false; }, []);
+
+  const { registerSentinel } = useOlderPages({ chatId, listElement, hasMore, isLoadingOlder, onLoadOlder, captureAnchor, leaveBottom });
 
   return {
     registerList,
