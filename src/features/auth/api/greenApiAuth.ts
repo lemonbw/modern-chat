@@ -43,20 +43,35 @@ export const logoutGreenApiInstance = async () => {
   return data?.isLogout === true;
 };
 
+/** getAccountSettings has no name, but the account's own entry in the chat list is titled with it. */
+const selfChatName = async (chatId?: string): Promise<string> => {
+  if (!chatId) return "";
+  const name = await greenApiRead("getChats", "account-name", async () => {
+    const { data } = await greenApiClient.get<Array<{ chatId?: string; id?: string; name?: string }>>(greenApiUrl("getChats"));
+    return (Array.isArray(data) ? data.find((chat) => (chat.chatId ?? chat.id) === chatId)?.name : "") ?? "";
+  }).catch(() => "");
+  return name.trim();
+};
+
 export const getUserProfile = async (): Promise<UserProfile> => {
   const { data } = await greenApiClient.get<TelegramSettings>(greenApiUrl("getAccountSettings"));
-  const phone = data.phone ?? "";
-  const nickname = data.username?.replace(/^@/, "") ?? "";
-  // The settings endpoint only knows the username, so the names come from the contact card.
   const card = data.chatId ? await getContactInfo(data.chatId).catch(() => null) : null;
-  const fullName = card?.name?.trim() || data.name?.trim() || (nickname ? `@${nickname}` : "Telegram user");
-  const { firstName, lastName } = splitFullName(fullName);
-  const avatar = data.avatar || data.base64Avatar
-    ? data.avatar || `data:image/jpeg;base64,${data.base64Avatar}`
-    : card?.avatar ? card.avatar : card?.base64Avatar ? `data:image/jpeg;base64,${card.base64Avatar}` : null;
+  const ownName = await selfChatName(data.chatId);
+  // The contact card is the best source but its quota is often spent, the self chat is free.
+  const cardName = splitFullName(card?.name ?? "");
+  const chatName = splitFullName(ownName);
+  const accountName = splitFullName(data.name ?? "");
+  const firstName = cardName.firstName || chatName.firstName || accountName.firstName;
+  const lastName = cardName.lastName || chatName.lastName || accountName.lastName;
+  const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+  const nickname = data.username?.replace(/^@/, "") || card?.username?.replace(/^@/, "") || "";
+  const avatar = data.avatar
+    || (data.base64Avatar ? `data:image/jpeg;base64,${data.base64Avatar}` : null)
+    || card?.avatar
+    || (card?.base64Avatar ? `data:image/jpeg;base64,${card.base64Avatar}` : null);
   return {
-    name: fullName,
-    phone,
+    name: fullName || (nickname ? `@${nickname}` : "Telegram user"),
+    phone: String(data.phone ?? card?.phoneNumber ?? ""),
     avatar: avatar ?? null,
     firstName,
     lastName,
