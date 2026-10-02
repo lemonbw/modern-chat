@@ -47,16 +47,23 @@ export const getChatMessageStatus = async (chatId: string, idMessage: string): P
 
 const messageText = (item: GreenApiMessage) => {
   if (item.textMessage || item.extendedTextMessage?.text || item.caption) return item.textMessage ?? item.extendedTextMessage?.text ?? item.caption ?? "";
+  return mediaLabel(item.typeMessage);
+};
+
+export const mediaLabel = (typeMessage?: string) => {
   const labels: Record<string, string> = {
     imageMessage: "Photo",
     videoMessage: "Video",
+    videoNoteMessage: "Video message",
     audioMessage: "Audio",
+    voiceMessage: "Voice message",
     documentMessage: "Document",
     stickerMessage: "Sticker",
     locationMessage: "Location",
     contactMessage: "Contact",
+    pollMessage: "Poll",
   };
-  return labels[item.typeMessage ?? ""] ?? "Message";
+  return labels[typeMessage ?? ""] ?? "Message";
 };
 
 const JPEG_HEADER_HEX =
@@ -113,9 +120,10 @@ const messageMedia = (item: GreenApiMessage): ChatMessageMedia | undefined => {
   if (url.protocol !== "https:") return undefined;
   const kind = item.typeMessage === "stickerMessage" ? "sticker"
     : item.typeMessage === "imageMessage" ? "image"
-    : item.typeMessage === "videoMessage" ? "video"
-      : item.typeMessage === "audioMessage" ? "audio"
-        : undefined;
+      : item.typeMessage === "videoMessage" ? "video"
+        : item.typeMessage === "documentMessage" ? "document"
+          : item.typeMessage === "audioMessage" || item.typeMessage === "voiceMessage" || item.typeMessage === "videoNoteMessage" ? "audio"
+            : undefined;
   if (!kind) return undefined;
   return {
     kind,

@@ -1,7 +1,7 @@
 export type ChatMessageStatus = "sending" | "sent" | "delivered" | "read" | "failed";
 
 export type ChatMessageMedia = {
-  kind: "sticker" | "image" | "video" | "audio";
+  kind: "sticker" | "image" | "video" | "audio" | "document";
   url: string;
   mimeType?: string;
   fileName?: string;

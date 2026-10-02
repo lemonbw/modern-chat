@@ -80,6 +80,24 @@ const MessageMedia = ({ media, alt }: { media: ChatMessageMedia; alt: string }) 
     </video>;
   }
 
+  if (media.kind === "document") {
+    return <a
+      href={media.url}
+      download={media.fileName ?? true}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mb-1 flex items-center gap-2.5 rounded-lg border border-[#2c3b49] bg-[#1b2734] px-2.5 py-2 text-inherit no-underline hover:bg-[#22303d]"
+      aria-label={`Download document: ${media.fileName ?? "document"}`}
+    >
+      <span className="grid size-9 shrink-0 place-items-center rounded-md bg-[#2b3b49] text-lg" aria-hidden="true">📄</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm text-[#e5edf3]">{media.fileName ?? "Document"}</span>
+        <span className="block truncate text-micro text-[#8fa1ae]">{media.mimeType ?? "File"}</span>
+      </span>
+      <span className="shrink-0 text-lg text-[#8fa1ae]" aria-hidden="true">⬇</span>
+    </a>;
+  }
+
   return <audio
     className="mb-1 block w-[min(300px,70vw)] max-w-full"
     src={media.url}
