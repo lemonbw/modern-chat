@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import type { ChatMessage, Conversation } from "../../../entities/chat/types";
+import type { ChatMessage, Conversation, OutgoingFile } from "../../../entities/chat/types";
 import { archiveChat, getContactInfo, unarchiveChat } from "../../../features/contacts/api/greenApiContacts";
 import { useContactManager } from "../../../features/contacts/model/useContactManager";
-import { deleteChatMessage, forwardChatMessage, getChatMessage, getChatMessages, sendChatMessage } from "../../../features/messages/api/greenApiMessages";
+import { deleteChatMessage, fileKind, filePreviewLabel, forwardChatMessage, getChatMessage, getChatMessages, sendChatFile, sendChatMessage } from "../../../features/messages/api/greenApiMessages";
 import { searchChats } from "../../../features/search-chats/api/greenApiChats";
+import { loadChatPreviews, previewTimeLabel } from "../../../features/search-chats/model/chatPreviews";
 
 const avatarColors = ["linear-gradient(145deg,#76c5bb,#38998e)", "linear-gradient(145deg,#8f9bd4,#5b68a8)", "linear-gradient(145deg,#efad78,#ce6d67)"];
 const initials = (name: string) => name.split(/\s+/).slice(0, 2).map((part) => part[0] ?? "").join("").toUpperCase() || "?";
@@ -69,7 +70,11 @@ export const useChatPage = (isDemo = false) => {
   const deletedMessageIds = useRef(loadDeletedMessageIds());
   const loadedHistoryIds = useRef(new Set<string>());
   const historyPagesRef = useRef(new Map<string, HistoryPage>());
+  const selectedRef = useRef(selected);
+  const previewLoadedIds = useRef(new Set<string>());
+  const previewBlockedIds = useRef(new Set<string>());
   const [historyPages, setHistoryPages] = useState<Record<string, HistoryPage>>({});
+  const objectUrls = useRef<string[]>([]);
   const contactManager = useContactManager(!isDemo);
 
   const updateHistoryPage = useCallback((chatId: string, page: HistoryPage) => {
@@ -124,6 +129,39 @@ export const useChatPage = (isDemo = false) => {
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
+
+  // ─── Sidebar previews: last message then unread for every chat left unopened ──
+  useEffect(() => {
+    if (isDemo || isLoadingChats || chats.length === 0) return;
+    const pending = chats.filter((chat) => !previewLoadedIds.current.has(chat.id));
+    if (pending.length === 0) return;
+    pending.forEach((chat) => previewLoadedIds.current.add(chat.id));
+    let isMounted = true;
+
+    void loadChatPreviews(pending, new Set(selectedRef.current ? [selectedRef.current] : []), (patch) => {
+      if (!isMounted) return;
+      const blocked = previewBlockedIds.current.has(patch.id);
+      setChats((current) => current.map((chat) => chat.id !== patch.id ? chat : {
+        ...chat,
+        ...(patch.preview !== undefined && !blocked ? { preview: patch.preview } : {}),
+        ...(patch.timestamp !== undefined && !blocked
+          ? { time: previewTimeLabel(patch.timestamp), lastTimestamp: patch.timestamp }
+          : {}),
+        ...(patch.unread !== undefined ? { unread: patch.unread } : {}),
+      }));
+    }, () => !isMounted);
+
+    return () => { isMounted = false; };
+  }, [chats, isDemo, isLoadingChats]);
+
+  useEffect(() => () => {
+    objectUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    objectUrls.current = [];
+  }, []);
 
   // ─── Initial load sequence: Shell -> Active chat 20 msgs -> Chat list in parallel with media ───
   useEffect(() => {
@@ -344,9 +382,10 @@ export const useChatPage = (isDemo = false) => {
   const send = async (text: string, quotedMessage?: ChatMessage) => {
     if (isDemo || !selected) return;
     const chatId = selected;
-    const optimisticMessage: ChatMessage = { text, time: messageTime(), mine: true, status: "sending", quotedText: quotedMessage?.text };
+    const optimisticMessage: ChatMessage = { text, time: messageTime(), timestamp: Math.floor(Date.now() / 1000), mine: true, status: "sending", quotedText: quotedMessage?.text };
     setMessages((current) => ({ ...current, [chatId]: [...(current[chatId] ?? []), optimisticMessage] }));
-    setChats((current) => current.map((chat) => chat.id === chatId ? { ...chat, preview: text, time: optimisticMessage.time } : chat));
+    previewBlockedIds.current.add(chatId);
+    setChats((current) => current.map((chat) => chat.id === chatId ? { ...chat, preview: text, time: optimisticMessage.time, lastTimestamp: optimisticMessage.timestamp, unread: 0 } : chat));
     setLoadError(null);
     try {
       const { data } = await sendChatMessage(chatId, text, quotedMessage?.id);
@@ -355,6 +394,44 @@ export const useChatPage = (isDemo = false) => {
     } catch (error) {
       setMessages((current) => ({ ...current, [chatId]: (current[chatId] ?? []).map((message) => message === optimisticMessage ? { ...message, status: "failed" } : message) }));
       setLoadError(errorMessage(error, "Could not send message"));
+    }
+  };
+
+  const sendFile = async (file: OutgoingFile, caption?: string, quotedMessage?: ChatMessage) => {
+    if (isDemo || !selected) return;
+    const chatId = selected;
+    const label = filePreviewLabel(file);
+    const previewUrl = URL.createObjectURL(file.blob);
+    objectUrls.current.push(previewUrl);
+    const optimisticMessage: ChatMessage = {
+      text: caption?.trim() || label,
+      time: messageTime(),
+      timestamp: Math.floor(Date.now() / 1000),
+      mine: true,
+      status: "sending",
+      quotedText: quotedMessage?.text,
+      media: { kind: fileKind(file), url: previewUrl, mimeType: file.mimeType, fileName: file.fileName, caption: caption?.trim() || undefined },
+    };
+    setMessages((current) => ({ ...current, [chatId]: [...(current[chatId] ?? []), optimisticMessage] }));
+    previewBlockedIds.current.add(chatId);
+    setChats((current) => current.map((chat) => chat.id === chatId ? { ...chat, preview: optimisticMessage.text, time: optimisticMessage.time, lastTimestamp: optimisticMessage.timestamp, unread: 0, hasConversation: true } : chat));
+    setLoadError(null);
+    try {
+      const { data } = await sendChatFile(chatId, file, caption?.trim() || undefined, quotedMessage?.id);
+      setMessages((current) => ({ ...current, [chatId]: (current[chatId] ?? []).map((message) => message === optimisticMessage
+        ? { ...message, id: data.idMessage, status: "sent" }
+        : message) }));
+    } catch (error) {
+      setMessages((current) => ({ ...current, [chatId]: (current[chatId] ?? []).map((message) => message === optimisticMessage ? { ...message, status: "failed" } : message) }));
+      setLoadError(errorMessage(error, "Could not send the file"));
+    }
+  };
+
+  /** Sends files one by one so GREEN-API keeps the queue order and its rate limits are respected. */
+  const sendFiles = async (files: OutgoingFile[], quotedMessage?: ChatMessage, caption?: string) => {
+    for (const [index, file] of files.entries()) {
+      await sendFile(file, files.length === 1 ? caption : undefined, quotedMessage);
+      if (index === files.length - 1) break;
     }
   };
 
@@ -436,7 +513,7 @@ export const useChatPage = (isDemo = false) => {
     isLoadingOlderMessages: selected ? historyPages[selected]?.loadingOlder ?? false : false,
     ...contactManager,
     setMobileOpen,
-    selectChat, send, forwardMessage, saveContact, saveGroup, toggleArchive, deleteMessage, loadOlderMessages,
+    selectChat, send, sendFiles, forwardMessage, saveContact, saveGroup, toggleArchive, deleteMessage, loadOlderMessages,
     showDeletedMessages, toggleDeletedMessages,
   };
 };
