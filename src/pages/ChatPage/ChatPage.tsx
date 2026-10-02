@@ -38,6 +38,7 @@ export const ChatPage = ({ profile, accounts, onSwitchAccount, onAddAccount, onS
         />
         {page.activeChat ? (
           <ChatWindow
+            key={page.activeChat.id}
             chat={page.activeChat}
             forwardingTargets={page.chats}
             messages={activeMessages}
@@ -48,6 +49,7 @@ export const ChatPage = ({ profile, accounts, onSwitchAccount, onAddAccount, onS
             archived={page.activeChat.archived ?? false}
             error={page.loadError}
             onSend={(text, quotedMessage) => void page.send(text, quotedMessage)}
+            onSendFiles={(files, quotedMessage, caption) => void page.sendFiles(files, quotedMessage, caption)}
             onBack={() => page.setMobileOpen(false)}
             onToggleArchive={() => void page.toggleArchive()}
             onDeleteMessage={(message, onlySenderDelete) => page.deleteMessage(message, onlySenderDelete)}
