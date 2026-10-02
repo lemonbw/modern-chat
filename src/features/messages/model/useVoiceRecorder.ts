@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useVoicePlayback } from "./useVoicePlayback";
 
 export type VoiceStatus = "idle" | "recording" | "paused";
 
@@ -9,7 +10,6 @@ export type VoiceRecording = {
   durationMs: number;
 };
 
-/** Telegram shows a native voice bubble only for OGG/OPUS, so OGG is preferred when the browser can record it. */
 const supportedMimeTypes = ["audio/ogg;codecs=opus", "audio/ogg", "audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
 const chunkIntervalMs = 250;
 const peakIntervalMs = 70;
@@ -28,7 +28,6 @@ export const useVoiceRecorder = () => {
   const [status, setStatus] = useState<VoiceStatus>("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [peaks, setPeaks] = useState<number[]>([]);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState("");
 
   const streamRef = useRef<MediaStream | null>(null);
@@ -43,8 +42,6 @@ export const useVoiceRecorder = () => {
   const accumulatedRef = useRef(0);
   const onStoppedRef = useRef<((recording: VoiceRecording) => void) | null>(null);
   const onFlushedRef = useRef<(() => void) | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const playbackUrlRef = useRef<string | null>(null);
 
   const elapsedNow = () => accumulatedRef.current + (Date.now() - segmentStartRef.current);
 
@@ -64,13 +61,18 @@ export const useVoiceRecorder = () => {
     contextRef.current = null;
   }, []);
 
-  const releasePlayback = useCallback(() => {
-    audioRef.current?.pause();
-    audioRef.current = null;
-    setIsPlaying(false);
-    if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
-    playbackUrlRef.current = null;
-  }, []);
+  const playback = useVoicePlayback(async () => {
+    const recorder = recorderRef.current;
+    if (!recorder || chunksRef.current.length === 0) return null;
+    if (recorder.state === "recording") {
+      await new Promise<void>((resolve) => {
+        onFlushedRef.current = resolve;
+        recorder.requestData();
+      });
+    }
+    if (chunksRef.current.length === 0) return null;
+    return URL.createObjectURL(new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" }));
+  }, setError);
 
   const reset = useCallback(() => {
     recorderRef.current = null;
@@ -84,9 +86,9 @@ export const useVoiceRecorder = () => {
     setElapsedMs(0);
     setPeaks([]);
     setError("");
-    releasePlayback();
+    playback.release();
     releaseStream();
-  }, [releasePlayback, releaseStream]);
+  }, [playback, releaseStream]);
 
   const samplePeaks = useCallback(() => {
     const analyser = analyserRef.current;
@@ -107,7 +109,7 @@ export const useVoiceRecorder = () => {
   const start = useCallback(async () => {
     if (status !== "idle") return;
     setError("");
-    releasePlayback();
+    playback.release();
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setError("Voice messages are not supported in this browser.");
       return;
@@ -153,7 +155,7 @@ export const useVoiceRecorder = () => {
         setElapsedMs(0);
         setPeaks([]);
         releaseStream();
-        releasePlayback();
+        playback.release();
         resolveStop({ blob, mimeType: recordedMimeType, extension: extensionFor(recordedMimeType), durationMs: duration });
       };
 
@@ -180,7 +182,7 @@ export const useVoiceRecorder = () => {
       setStatus("idle");
       setError(errorText(cause, "Could not access the microphone."));
     }
-  }, [releasePlayback, releaseStream, reset, samplePeaks, status]);
+  }, [playback, releaseStream, reset, samplePeaks, status]);
 
   const pause = useCallback(() => {
     const recorder = recorderRef.current;
@@ -228,60 +230,11 @@ export const useVoiceRecorder = () => {
     reset();
   }, [reset]);
 
-  /** Builds a playable URL from the audio captured so far without stopping the recorder. */
-  const buildPlaybackUrl = useCallback(async () => {
-    const recorder = recorderRef.current;
-    if (!recorder || chunksRef.current.length === 0) return null;
-    if (recorder.state === "recording") {
-      await new Promise<void>((resolve) => {
-        onFlushedRef.current = resolve;
-        recorder.requestData();
-      });
-    }
-    if (chunksRef.current.length === 0) return null;
-    return URL.createObjectURL(new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" }));
-  }, []);
-
-  const togglePlayback = useCallback(async () => {
-    const audio = audioRef.current;
-    if (audio && !audio.paused) {
-      audio.pause();
-      return;
-    }
-    const url = playbackUrlRef.current ?? (await buildPlaybackUrl());
-    if (!url) {
-      setError("Nothing to play yet — record a little longer.");
-      return;
-    }
-    if (url !== playbackUrlRef.current) {
-      if (playbackUrlRef.current) URL.revokeObjectURL(playbackUrlRef.current);
-      playbackUrlRef.current = url;
-    }
-    if (!audio) {
-      const element = new Audio(url);
-      element.addEventListener("ended", () => setIsPlaying(false));
-      audioRef.current = element;
-    } else {
-      audio.src = url;
-    }
-    try {
-      await audioRef.current?.play();
-      setIsPlaying(true);
-    } catch {
-      setError("Could not play the recording.");
-    }
-  }, [buildPlaybackUrl]);
-
-  const stopPlayback = useCallback(() => {
-    audioRef.current?.pause();
-    setIsPlaying(false);
-  }, []);
-
   useEffect(() => () => {
     if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.onstop = () => undefined;
     releaseStream();
-    releasePlayback();
-  }, [releasePlayback, releaseStream]);
+    playback.release();
+  }, [playback, releaseStream]);
 
   return {
     status,
@@ -289,15 +242,15 @@ export const useVoiceRecorder = () => {
     isPaused: status === "paused",
     elapsedMs,
     peaks,
-    isPlaying,
+    isPlaying: playback.isPlaying,
     error,
     start,
     pause,
     resume,
     finish,
     cancel,
-    togglePlayback,
-    stopPlayback,
+    togglePlayback: playback.toggle,
+    stopPlayback: playback.stop,
     clearError: useCallback(() => setError(""), []),
   };
 };
