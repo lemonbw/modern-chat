@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage, Conversation } from "../../../entities/chat/types";
-import { getContactInfo, getGroupData } from "../../../features/contacts/api/greenApiContacts";
+import { useContactDetails } from "./useContactDetails";
 import type { GreenApiContactInfo, GreenApiGroupData } from "../../../features/contacts/api/greenApiContacts";
 import { buildMembers, buildTabItems, groupTabs, userTabs, type InfoTab } from "../../../features/contacts/model/chatInfo";
 import { emptyProfile, readLocalProfile, writeLocalProfile, type LocalProfile } from "../../../features/contacts/model/localProfile";
@@ -46,8 +46,6 @@ export type InfoPanelModel = {
 };
 
 export const useInfoPanel = (chat: Conversation, messages: ChatMessage[]): InfoPanelModel => {
-  const [contact, setContact] = useState<GreenApiContactInfo | null>(null);
-  const [group, setGroup] = useState<GreenApiGroupData | null>(null);
   const [stored, setStored] = useState<LocalProfile | null>(null);
   const chatIdRef = useRef(chat.id);
 
@@ -69,15 +67,8 @@ export const useInfoPanel = (chat: Conversation, messages: ChatMessage[]): InfoP
 
   const isGroup = chat.group === true;
 
-  useEffect(() => {
-    let isMounted = true;
-    const request = isGroup
-      ? getGroupData(chat.id).then((data) => { if (isMounted) setGroup(data); }).catch(() => { if (isMounted) setGroup(null); })
-      : getContactInfo(chat.id).then((data) => { if (isMounted) setContact(data); }).catch(() => { if (isMounted) setContact(null); });
-    void request;
-    return () => { isMounted = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const details = useContactDetails(chat);
+  const { contact, group } = details;
 
   const members = useMemo(() => buildMembers(messages), [messages]);
   const totalMembers = group?.size ?? members.length;

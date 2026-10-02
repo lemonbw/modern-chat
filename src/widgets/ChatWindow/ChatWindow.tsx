@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ChatMessage, Conversation, OutgoingFile } from "../../entities/chat/types";
 import { ChatInfoPanel } from "../ChatInfoPanel/ChatInfoPanel";
 import { useChatSearch } from "./model/useChatSearch";
@@ -38,7 +38,10 @@ export const ChatWindow = (props: ChatWindowProps) => {
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [focusSignal, setFocusSignal] = useState(0);
 
-  const visibleMessages = messages.filter((message) => showDeletedMessages || !message.deleted);
+  const visibleMessages = useMemo(
+    () => messages.filter((message) => showDeletedMessages || !message.deleted),
+    [messages, showDeletedMessages],
+  );
   const search = useChatSearch(visibleMessages);
   const composer = useComposer({ onSend, onSendFiles });
   const actions = useMessageActions({
