@@ -24,6 +24,7 @@ const contentTypes = {
 };
 
 const proxy = await import("./dist-server/greenapi.mjs");
+const ogPreview = await import("./dist-server/og.mjs");
 
 const sendFile = (response, filePath, statusCode = 200) => {
   response.statusCode = statusCode;
@@ -52,6 +53,18 @@ const server = createServer(async (request, response) => {
         response.end(JSON.stringify({ error: error instanceof Error ? error.message : "Proxy error" }));
       } else {
         response.end();
+      }
+    }
+    return;
+  }
+
+  if (url.pathname === "/api/og") {
+    try {
+      await ogPreview.default(request, response);
+    } catch {
+      if (!response.headersSent) {
+        response.statusCode = 500;
+        response.end(JSON.stringify({ error: "Preview failed" }));
       }
     }
     return;

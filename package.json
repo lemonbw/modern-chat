@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc -b",
-    "build:server": "esbuild api/greenapi/[method].ts --bundle --platform=node --format=esm --outfile=dist-server/greenapi.mjs",
+    "build:server": "esbuild api/greenapi/[method].ts --bundle --platform=node --format=esm --outfile=dist-server/greenapi.mjs && esbuild api/og.ts --bundle --platform=node --format=esm --outfile=dist-server/og.mjs",
     "build:all": "pnpm run build && pnpm run build:server",
     "start": "node server.js",
     "docker:build": "docker build -t modern-chat .",
@@ -23,6 +23,7 @@
     "axios": "^1.20.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
+    "react-icons": "5.4.0",
     "tailwindcss": "^4.3.3",
     "zustand": "^5.0.15"
   },
