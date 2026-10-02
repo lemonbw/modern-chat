@@ -3,6 +3,8 @@ import { greenApiClient } from "../../../shared/api/greenApiClient";
 import { greenApiUrl } from "../../../shared/api/greenApiConfig";
 import { greenApiRead } from "../../../shared/api/greenApiRead";
 import type { UserProfile } from "../../../entities/user/types";
+import { splitFullName } from "../../../entities/user/types";
+import { getContactInfo } from "../../contacts/api/greenApiContacts";
 
 export const greenApiErrorMessage = (error: unknown, fallback: string) => {
   if (!axios.isAxiosError(error)) return error instanceof Error ? error.message : fallback;
@@ -44,9 +46,22 @@ export const logoutGreenApiInstance = async () => {
 export const getUserProfile = async (): Promise<UserProfile> => {
   const { data } = await greenApiClient.get<TelegramSettings>(greenApiUrl("getAccountSettings"));
   const phone = data.phone ?? "";
-  const name = data.name?.trim() || (data.username ? `@${data.username.replace(/^@/, "")}` : "Telegram user");
-  const avatar = data.avatar || (data.base64Avatar ? `data:image/jpeg;base64,${data.base64Avatar}` : null);
-  return { name, phone, avatar };
+  const nickname = data.username?.replace(/^@/, "") ?? "";
+  // The settings endpoint only knows the username, so the names come from the contact card.
+  const card = data.chatId ? await getContactInfo(data.chatId).catch(() => null) : null;
+  const fullName = card?.name?.trim() || data.name?.trim() || (nickname ? `@${nickname}` : "Telegram user");
+  const { firstName, lastName } = splitFullName(fullName);
+  const avatar = data.avatar || data.base64Avatar
+    ? data.avatar || `data:image/jpeg;base64,${data.base64Avatar}`
+    : card?.avatar ? card.avatar : card?.base64Avatar ? `data:image/jpeg;base64,${card.base64Avatar}` : null;
+  return {
+    name: fullName,
+    phone,
+    avatar: avatar ?? null,
+    firstName,
+    lastName,
+    nickname: nickname || undefined,
+  };
 };
 
 export const waitForAuthorization = async (signal: AbortSignal, requireFreshAuthorization = false) => {
