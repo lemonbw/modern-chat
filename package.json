@@ -16,7 +16,7 @@
     "build:server": "esbuild api/greenapi/[method].ts --bundle --platform=node --format=esm --outfile=dist-server/greenapi.mjs && esbuild api/og.ts --bundle --platform=node --format=esm --outfile=dist-server/og.mjs",
     "build:all": "pnpm run build && pnpm run build:server",
     "start": "node server.js",
-    "docker:build": "docker build -t modern-chat .",
+    "docker:build": "docker build --network=host -t modern-chat .",
     "docker:run": "docker run --rm -p 3000:3000 --env-file .env.local modern-chat"
   },
   "dependencies": {
