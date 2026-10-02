@@ -50,7 +50,7 @@ const toConversation = (chat: GreenApiChat, index: number): Conversation | null 
     group: chat.type ? ["group", "supergroup", "channel"].includes(chat.type) : id.startsWith("-"),
     archived: chat.archive ?? false,
     unread: chat.unreadCount ?? 0,
-    hasConversation: Boolean(lastMessage) || (chat.unreadCount ?? 0) > 0,
+    hasConversation: true,
     messages: [],
   };
 };

@@ -155,7 +155,7 @@ export const ChatWindow = ({
         >
           ←
         </button>
-        <ContactAvatar key={chat.id} chatId={chat.id} name={chat.name} initials={chat.initials} color={chat.color} className="avatar avatar-small" />
+        <ContactAvatar key={chat.id} chatId={chat.id} name={chat.name} initials={chat.initials} color={chat.color} avatar={chat.avatar} className="avatar avatar-small" />
         <div className="flex-1">
           <strong className="block text-sm text-[#f1f5f7]">{chat.name}</strong>
           {!chat.group && <span className="text-caption text-[#8fa1ae]">{chat.online ? "●  Online now" : lastSeenLabel(chat.lastSeen)}</span>}
