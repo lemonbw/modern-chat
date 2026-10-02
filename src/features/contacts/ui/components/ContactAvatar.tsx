@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { getContactAvatar, getContactInfo } from "../../api/greenApiContacts";
 
 const avatarStorageKey = "modern-chat-avatar-cache";
@@ -50,7 +50,7 @@ const toAvatarSource = (url?: string, base64?: string) => {
   return null;
 };
 
-export const ContactAvatar = ({
+export const ContactAvatar = memo(({
   chatId,
   name,
   initials,
@@ -134,4 +134,4 @@ export const ContactAvatar = ({
       )}
     </span>
   );
-};
+});

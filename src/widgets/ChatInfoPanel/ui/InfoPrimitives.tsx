@@ -1,3 +1,4 @@
+import { memo } from "react";
 export const Toggle = ({ checked, onChange, label }: { checked: boolean; onChange: (value: boolean) => void; label: string }) => (
   <button
     type="button"
@@ -11,12 +12,12 @@ export const Toggle = ({ checked, onChange, label }: { checked: boolean; onChang
   </button>
 );
 
-export const InfoRow = ({ label, value }: { label: string; value?: string | number | null }) => (
+export const InfoRow = memo(({ label, value }: { label: string; value?: string | number | null }) => (
   <div className="flex items-start justify-between gap-3">
     <span className="shrink-0 text-[#8fa1ae]">{label}</span>
     <span className="min-w-0 truncate text-right text-[#e5edf3]">{value ? String(value) : "—"}</span>
   </div>
-);
+));
 
 export const Field = ({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) => (
   <label className="flex flex-col gap-1">

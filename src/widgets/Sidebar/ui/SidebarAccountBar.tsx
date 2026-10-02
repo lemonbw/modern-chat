@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { LuEllipsisVertical } from "react-icons/lu";
 import type { UserProfile } from "../../../entities/user/types";
 import { formatPhone } from "../../../shared/lib/phone";
@@ -12,7 +12,7 @@ type Props = {
 };
 
 /** Account bar at the bottom of the sidebar: names, Telegram nickname, phone and the account menu. */
-export const SidebarAccountBar = ({ profile, accounts, onSignOut, onSwitchAccount, onAddAccount }: Props) => {
+export const SidebarAccountBar = memo(({ profile, accounts, onSignOut, onSwitchAccount, onAddAccount }: Props) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [signOutError, setSignOutError] = useState("");
   const [signingOut, setSigningOut] = useState(false);
@@ -60,4 +60,4 @@ export const SidebarAccountBar = ({ profile, accounts, onSignOut, onSwitchAccoun
       )}
     </div>
   );
-};
+});
