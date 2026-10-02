@@ -1,11 +1,12 @@
 import type { Conversation } from "../../../entities/chat/types";
-import { getChatUnreadCount, getLastChatMessage, messagePreview } from "../../messages/api/greenApiMessages";
+import { getChatSidebarInfo, messagePreview, senderNameOf } from "../../messages/api/greenApiMessages";
 
 export type ChatPreviewPatch = {
   id: string;
   preview?: string;
   timestamp?: number;
   unread?: number;
+  sender?: string;
 };
 
 const formatTime = (timestamp?: number) =>
@@ -14,10 +15,9 @@ const formatTime = (timestamp?: number) =>
     : "";
 
 /**
- * Fills the sidebar with the last message of every chat that was not opened.
- * GREEN-API Telegram has no unread counter, so a chat whose newest message is incoming
- * costs a second history request to count the unread run; chats ending with our own
- * message are known to be read without another call.
+ * Fills the sidebar for every chat that was not opened. Each chat costs one history request that
+ * carries both the newest message and the unread run, so the list fills at the pace of the
+ * GREEN-API rate limit instead of two requests per chat.
  */
 export const loadChatPreviews = async (
   chats: Conversation[],
@@ -29,20 +29,19 @@ export const loadChatPreviews = async (
   for (const chat of pending) {
     if (isCancelled()) return;
     try {
-      const last = await getLastChatMessage(chat.id);
+      const { last, unread } = await getChatSidebarInfo(chat.id);
       if (isCancelled()) return;
       if (!last) {
         onPatch({ id: chat.id, preview: "", unread: 0 });
         continue;
       }
-      onPatch({ id: chat.id, preview: messagePreview(last), timestamp: last.timestamp });
-      if (last.type === "outgoing") {
-        onPatch({ id: chat.id, unread: 0 });
-        continue;
-      }
-      const unread = await getChatUnreadCount(chat.id);
-      if (isCancelled()) return;
-      onPatch({ id: chat.id, unread });
+      onPatch({
+        id: chat.id,
+        preview: messagePreview(last),
+        timestamp: last.timestamp,
+        unread,
+        sender: chat.group ? senderNameOf(last) || undefined : undefined,
+      });
     } catch {
       // A chat without a preview stays usable, the next load retries it.
     }

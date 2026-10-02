@@ -19,6 +19,7 @@ export type ChatMessage = {
   mine?: boolean;
   status?: ChatMessageStatus;
   quotedText?: string;
+  sender?: string;
   deleted?: boolean;
   media?: ChatMessageMedia;
 };
@@ -32,6 +33,7 @@ export type Conversation = {
   time: string;
   unread?: number;
   lastTimestamp?: number;
+  sender?: string;
   online?: boolean;
   lastSeen?: string | number | null;
   avatar?: string | null;

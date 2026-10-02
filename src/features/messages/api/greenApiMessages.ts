@@ -12,6 +12,11 @@ type GreenApiMessage = {
   statusMessage?: string;
   extendedTextMessage?: { text?: string };
   deletedMessageData?: { stanzaId?: string };
+  senderId?: string;
+  senderName?: string;
+  senderContactName?: string;
+  senderType?: string;
+  textWithEntities?: string;
   downloadUrl?: string;
   caption?: string;
   fileName?: string;
@@ -49,6 +54,12 @@ const messageText = (item: GreenApiMessage) => {
   if (item.textMessage || item.extendedTextMessage?.text || item.caption) return item.textMessage ?? item.extendedTextMessage?.text ?? item.caption ?? "";
   return mediaLabel(item.typeMessage);
 };
+
+const mediaTypeMessages = new Set(["imageMessage", "videoMessage", "videoNoteMessage", "audioMessage", "voiceMessage", "documentMessage", "stickerMessage"]);
+
+export const isMediaMessage = (item: GreenApiMessage) => mediaTypeMessages.has(item.typeMessage ?? "");
+
+export const senderNameOf = (item: GreenApiMessage) => item.senderContactName?.trim() || item.senderName?.trim() || "";
 
 export const mediaLabel = (typeMessage?: string) => {
   const labels: Record<string, string> = {
@@ -135,31 +146,25 @@ const messageMedia = (item: GreenApiMessage): ChatMessageMedia | undefined => {
   };
 };
 
-export const messagePreview = messageText;
-
-/** Newest message of a chat, used for the sidebar preview of chats that were never opened. */
-export const getLastChatMessage = async (chatId: string): Promise<GreenApiMessage | undefined> => {
-  return greenApiRead("getChatHistory", `${chatId}:1`, async () => {
-    const { data } = await greenApiClient.post<GreenApiMessage[]>(greenApiUrl("getChatHistory"), { chatId, count: 1 });
-    return Array.isArray(data) ? data[0] : undefined;
-  });
-};
+/** Sidebar preview: media never loads its file, it only shows the type and the send time. */
+export const messagePreview = (item: GreenApiMessage) => (isMediaMessage(item) ? mediaLabel(item.typeMessage) : messageText(item));
 
 /**
- * GREEN-API Telegram does not expose unread counters, so unread is the run of incoming messages
- * at the end of the history — everything after the last message this account sent.
+ * One history call per chat feeds both sidebar values: the newest message and the unread count.
+ * GREEN-API Telegram has no unread counter, so unread is the run of incoming messages at the end
+ * of the history — everything after the last message this account sent.
  */
-export const getChatUnreadCount = async (chatId: string, count = 100): Promise<number> => {
-  return greenApiRead("getChatHistory", `unread:${chatId}:${count}`, async () => {
+export const getChatSidebarInfo = async (chatId: string, count = 100): Promise<{ last?: GreenApiMessage; unread: number }> => {
+  return greenApiRead("getChatHistory", `sidebar:${chatId}:${count}`, async () => {
     const { data } = await greenApiClient.post<GreenApiMessage[]>(greenApiUrl("getChatHistory"), { chatId, count });
-    if (!Array.isArray(data)) return 0;
+    if (!Array.isArray(data)) return { unread: 0 };
     let unread = 0;
     for (const item of data) {
       if (item.type === "outgoing") break;
       if (item.deletedMessageData) continue;
       unread += 1;
     }
-    return unread;
+    return { last: data[0], unread };
   });
 };
 
@@ -176,6 +181,7 @@ export const getChatMessages = async (chatId: string, count = 100): Promise<Chat
           ? new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(item.timestamp * 1000))
           : "",
         timestamp: item.timestamp,
+        sender: senderNameOf(item) || undefined,
         mine: item.type === "outgoing",
         status: item.type === "outgoing" ? statusFromApi(item.statusMessage) : undefined,
         deleted: item.typeMessage === "deletedMessage",
