@@ -3,32 +3,6 @@ import type { ChatMessageMedia } from "../../../entities/chat/types";
 
 const MessageMedia = ({ media, alt }: { media: ChatMessageMedia; alt: string }) => {
   const [expanded, setExpanded] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-
-  const handleDownload = async (event: React.MouseEvent) => {
-    event.stopPropagation();
-    if (downloading) return;
-    setDownloading(true);
-    try {
-      const response = await fetch(media.url);
-      if (!response.ok) throw new Error("Failed to download image");
-      const blob = await response.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = objectUrl;
-      const defaultName = media.fileName ?? media.url.split("/").pop()?.split("?")[0] ?? "image.jpg";
-      link.download = defaultName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-    } catch {
-      // Fallback in case of CORS or network error
-      window.open(media.url, "_blank");
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   if (media.kind === "sticker") {
     const stickerSource = media.thumbnail ?? (media.mimeType === "application/x-tgsticker" ? undefined : media.url);
@@ -39,6 +13,7 @@ const MessageMedia = ({ media, alt }: { media: ChatMessageMedia; alt: string }) 
 
   if (media.kind === "image") {
     const previewSrc = media.url || media.thumbnail;
+    const downloadFileName = media.fileName ?? media.url.split("/").pop()?.split("?")[0] ?? "image.jpg";
     return <>
       <button
         type="button"
@@ -64,16 +39,18 @@ const MessageMedia = ({ media, alt }: { media: ChatMessageMedia; alt: string }) 
       </button>
       {expanded && <div className="fixed inset-0 z-50 grid place-items-center bg-black/85 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setExpanded(false); }}>
         <div className="absolute right-4 top-4 flex items-center gap-2">
-          <button
-            type="button"
-            className="grid size-10 place-items-center rounded-full bg-black/50 text-lg text-white hover:bg-black/70 disabled:opacity-50"
+          <a
+            href={media.url}
+            download={downloadFileName}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="grid size-10 place-items-center rounded-full bg-black/50 text-lg text-white hover:bg-black/70"
             aria-label="Download image"
             title="Download image"
-            disabled={downloading}
-            onClick={handleDownload}
+            onClick={(event) => event.stopPropagation()}
           >
-            {downloading ? "…" : "⬇"}
-          </button>
+            ⬇
+          </a>
           <button
             type="button"
             className="grid size-10 place-items-center rounded-full bg-black/50 text-2xl text-white hover:bg-black/70"
