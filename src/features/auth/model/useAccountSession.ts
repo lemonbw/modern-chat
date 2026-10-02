@@ -86,6 +86,7 @@ const retryRefresh = async (refresh: (attempt: number) => Promise<void>, attempt
     if (!current || isDemoProfile(current) || !looksLikeNicknameOnly(current) || profileRefreshRef.current) return;
     profileRefreshRef.current = true;
 
+
     const refresh = async (attempt: number) => {
       try {
         const fresh = await getUserProfile();

@@ -21,6 +21,7 @@ type Options = {
   leaveBottom: () => void;
 };
 
+/** The sentinel, the observer that watches it and the batched requests it triggers. */
 export const useOlderPages = ({ chatId, listElement, hasMore, isLoadingOlder, onLoadOlder, captureAnchor, leaveBottom }: Options) => {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -29,12 +30,14 @@ export const useOlderPages = ({ chatId, listElement, hasMore, isLoadingOlder, on
     const sentinel = sentinelRef.current;
     if (!list || !sentinel) return;
 
+    /** Measured from the DOM: the observer callback of the previous page arrives a frame late. */
     const isTopInView = () => {
       const sentinelRect = sentinel.getBoundingClientRect();
       const listRect = list.getBoundingClientRect();
       return sentinelRect.top >= listRect.top - loadAhead && sentinelRect.bottom <= listRect.bottom + loadAhead;
     };
 
+    /** A trigger pulls up to `olderBatchLimit` pages, but only while the top is still on screen. */
     const loadOlder = async () => {
       if (!hasMore || isLoadingOlder) return;
       for (let page = 0; page < olderBatchLimit; page += 1) {

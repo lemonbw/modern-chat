@@ -20,6 +20,7 @@ type Props = {
   registerRef: (element: HTMLDivElement | null) => void;
 };
 
+/** Memoised: the wall renders a few hundred of these and polls every fifteen seconds. */
 export const MessageBubble = memo(({ message, isGroup, onContextMenu, onAskDelete, registerRef }: Props) => (
   <div
     ref={registerRef}

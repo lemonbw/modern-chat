@@ -95,8 +95,10 @@ export const useInfoPanel = (chat: Conversation, messages: ChatMessage[]): InfoP
   }, []);
 
   const displayName = [stored?.firstName, stored?.lastName].filter(Boolean).join(" ").trim() || chat.name;
+  // getChats and getContacts already carry the phone and username.
   const phone = contact?.phoneNumber ?? chat.phoneNumber;
   const username = contact?.username ?? chat.username;
+  // getContactInfo is limited to about a hundred calls a month, so the panel may show list data.
   const detailsFromChatList = !isGroup && contact === null;
 
   const lastSeenText = isGroup

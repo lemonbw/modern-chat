@@ -1,3 +1,4 @@
+/** One formatter per format instead of one per label, and the labels themselves are memoised. */
 const timeFormatter = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
 const dateTimeFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 

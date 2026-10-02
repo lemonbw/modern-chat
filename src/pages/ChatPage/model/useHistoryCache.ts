@@ -12,6 +12,7 @@ type Options = {
   updateHistoryPage: (chatId: string, page: HistoryPage) => void;
 };
 
+/** The read history of every chat in IndexedDB, so a chat paints before the network answers. */
 export const useHistoryCache = ({ isDemo, selected, messages, historyPagesRef, publishHistory, updateHistoryPage }: Options) => {
   useEffect(() => {
     if (isDemo || !selected) return;
@@ -26,6 +27,7 @@ export const useHistoryCache = ({ isDemo, selected, messages, historyPagesRef, p
     return () => { isMounted = false; };
   }, [historyPagesRef, isDemo, publishHistory, selected, updateHistoryPage]);
 
+  // Polls run every fifteen seconds, so the cache is only written when the window really changed.
   const cachedSignatures = useRef(new Map<string, string>());
   useEffect(() => {
     if (isDemo) return;

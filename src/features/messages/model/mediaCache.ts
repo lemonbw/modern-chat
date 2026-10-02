@@ -1,5 +1,6 @@
 import type { ChatMessageMedia } from "../../../entities/chat/types";
 
+/** Media descriptors are derived once per message and kept by a stable reference. */
 export type MediaDescriptor = {
   media: ChatMessageMedia;
   previewSource: string | undefined;

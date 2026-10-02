@@ -20,6 +20,7 @@ type Props = {
   onJumpToMessage: (index: number) => void;
 };
 
+/** In-chat search field with its result list. */
 export const ChatSearchField = memo(({ search, onJumpToMessage }: Props) => (
   <div className="relative flex min-w-0 flex-1 items-center gap-2 rounded-[9px] bg-[#202b36] py-[7px] pr-2 pl-2.5">
     <LuSearch className="size-[16px] shrink-0 text-[#8fa1ae]" aria-hidden="true" />

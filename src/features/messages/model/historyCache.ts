@@ -36,6 +36,7 @@ export const writeHistoryCache = async (chatId: string, messages: ChatMessage[])
     await idbSet(historyKey(chatId), {
       chatId,
       savedAt: Date.now(),
+      // Oldest first, newest kept.
       messages: messages.slice(-messagesPerChat),
     } satisfies HistoryCacheEntry);
   } catch {

@@ -33,6 +33,7 @@ export const SidebarAccountBar = memo(({ profile, accounts, onSignOut, onSwitchA
   const nickname = profile.nickname?.replace(/^@/, "") ?? "";
   const firstName = profile.firstName?.trim() ?? "";
   const lastName = profile.lastName?.trim() ?? "";
+
   const fullName = [firstName, lastName].filter(Boolean).join(" ").trim()
     || (profile.name.replace(/^@/, "") !== nickname ? profile.name : "");
   const phone = formatPhone(profile.phone);

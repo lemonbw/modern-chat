@@ -18,6 +18,7 @@ type Options = {
   contactManager: ContactManagerModel;
 };
 
+/** What happens because the open chat changed: back button, contact card, header actions. */
 export const useChatSelection = ({ isDemo, selected, setSelected, setLoadError, chats, setChats, isLoadingChats, patchChat, contactManager }: Options) => {
   // Browser back and forward.
   useEffect(() => {

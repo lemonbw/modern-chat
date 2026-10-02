@@ -1,6 +1,7 @@
 import { memo, useState } from "react";
 import type { MediaDescriptor } from "../model/mediaCache";
 
+/** One attachment. Memoised, the descriptor and the alt text are stable per message. */
 const MessageMedia = memo(({ descriptor, alt }: { descriptor: MediaDescriptor; alt: string }) => {
   const { media, previewSource, downloadFileName } = descriptor;
   const [expanded, setExpanded] = useState(false);

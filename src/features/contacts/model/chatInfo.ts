@@ -58,6 +58,7 @@ const collectMedia = (messages: ChatMessage[], kinds: readonly MediaKind[]): Inf
     }];
   });
 
+/** GREEN-API has no stories endpoint, so the tab stays empty. */
 export const buildTabItems = (messages: ChatMessage[], tab: InfoTab, options: { showPhotos?: boolean; showVideos?: boolean } = {}): InfoItem[] => {
   const { showPhotos = true, showVideos = true } = options;
   if (tab === "stories") return [];

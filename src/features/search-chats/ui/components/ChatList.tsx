@@ -22,6 +22,7 @@ type RowProps = {
   onSelect: (id: string) => void;
 };
 
+/** One sidebar row, memoised because the list rerenders on every poll. */
 const ChatRow = memo(({ chat, isSelected, onSelect }: RowProps) => {
   const badge = unreadLabel(chat.unread, chat.unreadTruncated);
   return <button
