@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "../../../entities/chat/types";
 import { getChatMessages } from "../../../features/messages/api/greenApiMessages";
-import { readHistoryCache, writeHistoryCache } from "../../../features/messages/model/historyCache";
+import { useHistoryCache } from "./useHistoryCache";
 import {
   errorMessage,
   historyPageSize,
@@ -34,22 +34,6 @@ export const useChatHistory = ({ isDemo, selected, onLoadError, onLatestMessage 
   const deletedMessageIds = useRef(loadDeletedMessageIds());
 
   useEffect(() => { messagesRef.current = messages; }, [messages]);
-
-
-  const cachedSignatures = useRef(new Map<string, string>());
-  useEffect(() => {
-    if (isDemo) return;
-    const timer = window.setTimeout(() => {
-      for (const [chatId, list] of Object.entries(messages)) {
-        if (list.length === 0) continue;
-        const signature = `${list.length}:${list[0]?.id ?? ""}:${list[list.length - 1]?.id ?? ""}`;
-        if (cachedSignatures.current.get(chatId) === signature) continue;
-        cachedSignatures.current.set(chatId, signature);
-        void writeHistoryCache(chatId, list);
-      }
-    }, 1_500);
-    return () => window.clearTimeout(timer);
-  }, [isDemo, messages]);
 
   const updateHistoryPage = useCallback((chatId: string, page: HistoryPage) => {
     historyPagesRef.current.set(chatId, page);
@@ -91,19 +75,7 @@ export const useChatHistory = ({ isDemo, selected, onLoadError, onLatestMessage 
     if (otherMedia.length > 0) publishStage(chronological([...textMessages, ...stickerMessages, ...otherMedia]));
   }, []);
 
-  // The cache is the fast path: cached messages paint first, the network refresh only merges on top.
-  useEffect(() => {
-    if (isDemo || !selected) return;
-    const chatId = selected;
-    let isMounted = true;
-    void readHistoryCache(chatId).then((cached) => {
-      if (!isMounted || cached.length === 0) return;
-      publishHistory(chatId, cached);
-      const page = historyPagesRef.current.get(chatId);
-      updateHistoryPage(chatId, { count: Math.max(page?.count ?? 0, cached.length), hasMore: true, loadingOlder: false });
-    }).catch(() => undefined);
-    return () => { isMounted = false; };
-  }, [isDemo, publishHistory, selected, updateHistoryPage]);
+  useHistoryCache({ isDemo, selected, messages, historyPagesRef, publishHistory, updateHistoryPage });
 
   const markLoaded = useCallback((chatId: string) => { loadedHistoryIds.current.add(chatId); }, []);
   const isLoaded = useCallback((chatId: string) => loadedHistoryIds.current.has(chatId), []);
