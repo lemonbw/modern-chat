@@ -1,8 +1,9 @@
-import { LuArrowLeft, LuEllipsisVertical, LuSearch, LuX } from "react-icons/lu";
+import { LuArrowLeft, LuSearch, LuX } from "react-icons/lu";
 import { ContactAvatar } from "../../../features/contacts/ui/components/ContactAvatar";
 import { lastSeenLabel } from "../../../shared/lib/lastSeen";
-import { messageDateLabel } from "../../../shared/lib/messageDate";
 import { contentGutter, contentInset, pageColumn } from "../lib/layout";
+import { ChatHeaderMenu } from "./ChatHeaderMenu";
+import { ChatSearchField, type ChatSearchModel } from "./ChatSearchField";
 
 type Props = {
   chat: {
@@ -21,18 +22,7 @@ type Props = {
   onOpenInfo: () => void;
   onToggleArchive: () => void;
   onToggleDeletedMessages: () => void;
-  search: {
-    isOpen: boolean;
-    query: string;
-    setQuery: (value: string) => void;
-    normalized: string;
-    results: {
-      message: { text: string; timestamp?: number; time: string };
-      index: number;
-    }[];
-    open: () => void;
-    close: () => void;
-  };
+  search: ChatSearchModel;
   onJumpToMessage: (index: number) => void;
   menuOpen: boolean;
   setMenuOpen: (value: boolean) => void;
@@ -40,6 +30,10 @@ type Props = {
   onToggleNotifications: () => void;
 };
 
+/**
+ * Title bar of the open chat: back, avatar, either the search field or the name, and the two
+ * buttons. The search field and the overflow menu live in their own files.
+ */
 export const ChatHeader = ({
   chat,
   archived,
@@ -54,158 +48,73 @@ export const ChatHeader = ({
   setMenuOpen,
   notificationsOff,
   onToggleNotifications,
-}: Props) => (
-  <header className="z-[1] shrink-0 border-b border-[#202d39] bg-chat shadow-[0_1px_3px_#0002]">
-    <div className={contentGutter}>
-    <div
-      className={`${pageColumn} ${contentInset} flex h-[62px] items-center max-[760px]:h-[58px]`}
-    >
-      <div className="flex w-full items-center gap-3">
-        <button
-          className="icon-button hidden max-[760px]:grid"
-          aria-label="Back to conversations"
-          onClick={onBack}
-        >
-          <LuArrowLeft className="size-[18px]" />
-        </button>
-        <button
-          className="shrink-0 rounded-full border-0 bg-transparent p-0 hover:opacity-80"
-          aria-label={`${chat.group ? "Group" : "User"} info for ${chat.name}`}
-          title={`${chat.group ? "Group" : "User"} info`}
-          onClick={onOpenInfo}
-        >
-          <ContactAvatar
-            key={chat.id}
-            chatId={chat.id}
-            name={chat.name}
-            initials={chat.initials}
-            color={chat.color}
-            avatar={chat.avatar}
-            className="avatar avatar-small"
-          />
-        </button>
-        {search.isOpen ? (
-          <div className="relative flex min-w-0 flex-1 items-center gap-2 rounded-[9px] bg-[#202b36] py-[7px] pr-2 pl-2.5">
-            <LuSearch
-              className="size-[16px] shrink-0 text-[#8fa1ae]"
-              aria-hidden="true"
-            />
-            <input
-              autoFocus
-              type="search"
-              aria-label="Search messages in this chat"
-              placeholder="Search in this chat…"
-              className="min-w-0 flex-1 border-0 bg-transparent text-sm text-[#e5edf3] outline-none placeholder:text-[#8d9eaa]"
-              value={search.query}
-              onChange={(event) => search.setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") search.close();
-              }}
-            />
-            {search.normalized && (
-              <div className="absolute top-full right-0 left-0 z-20 mt-1 rounded-lg border border-chat-border bg-[#1c2934] p-2 shadow-xl">
-                <p className="px-1 pb-1 text-[11px] text-[#8fa1ae]">
-                  {search.results.length} found
-                </p>
-                <div className="max-h-64 overflow-auto">
-                  {search.results.map(({ message, index }) => (
-                    <button
-                      key={`${index}-${message.time}`}
-                      className="block w-full rounded-md px-2 py-1.5 text-left hover:bg-[#253441]"
-                      onClick={() => onJumpToMessage(index)}
-                    >
-                      <span className="line-clamp-2 block text-xs text-[#d7e2e9]">
-                        {message.text}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] text-[#8fa1ae]">
-                        {messageDateLabel(message.timestamp)} · {message.time}
-                      </span>
-                    </button>
-                  ))}
-                  {search.results.length === 0 && (
-                    <p className="px-2 py-2 text-xs text-[#8fa1ae]">
-                      Nothing found
-                    </p>
+}: Props) => {
+  const closeMenu = () => setMenuOpen(false);
+  return (
+    <header className="z-[1] shrink-0 border-b border-[#202d39] bg-chat shadow-[0_1px_3px_#0002]">
+      <div className={contentGutter}>
+        <div className={`${pageColumn} ${contentInset} flex h-[62px] items-center max-[760px]:h-[58px]`}>
+          <div className="flex w-full items-center gap-3">
+            <button className="icon-button hidden max-[760px]:grid" aria-label="Back to conversations" onClick={onBack}>
+              <LuArrowLeft className="size-[18px]" />
+            </button>
+            <button
+              className="shrink-0 rounded-full border-0 bg-transparent p-0 hover:opacity-80"
+              aria-label={`${chat.group ? "Group" : "User"} info for ${chat.name}`}
+              title={`${chat.group ? "Group" : "User"} info`}
+              onClick={onOpenInfo}
+            >
+              <ContactAvatar key={chat.id} chatId={chat.id} name={chat.name} initials={chat.initials} color={chat.color} avatar={chat.avatar} className="avatar avatar-small" />
+            </button>
+            {search.isOpen
+              ? <ChatSearchField search={search} onJumpToMessage={onJumpToMessage} />
+              : (
+                <div className="min-w-0 flex-1">
+                  <strong className="block truncate text-sm text-[#f1f5f7]">{chat.name}</strong>
+                  {!chat.group && (
+                    <span className="text-caption text-[#8fa1ae]">
+                      {chat.online ? "●  Online now" : lastSeenLabel(chat.lastSeen)}
+                    </span>
                   )}
                 </div>
-              </div>
-            )}
+              )}
+            <button
+              className="icon-button"
+              aria-label={search.isOpen ? "Close search" : "Search messages"}
+              title={search.isOpen ? "Close search" : "Search messages"}
+              aria-expanded={search.isOpen}
+              onClick={() => {
+                if (search.isOpen) search.close();
+                else search.open();
+              }}
+            >
+              {search.isOpen ? <LuX className="size-[17px]" /> : <LuSearch className="size-[18px]" />}
+            </button>
+            <ChatHeaderMenu
+              isOpen={menuOpen}
+              archived={archived}
+              notificationsOff={notificationsOff}
+              showDeletedMessages={showDeletedMessages}
+              onOpen={() => {
+                search.close();
+                setMenuOpen(!menuOpen);
+              }}
+              onToggleArchive={() => {
+                onToggleArchive();
+                closeMenu();
+              }}
+              onToggleNotifications={() => {
+                onToggleNotifications();
+                closeMenu();
+              }}
+              onToggleDeletedMessages={() => {
+                onToggleDeletedMessages();
+                closeMenu();
+              }}
+            />
           </div>
-        ) : (
-          <div className="min-w-0 flex-1">
-            <strong className="block truncate text-sm text-[#f1f5f7]">
-              {chat.name}
-            </strong>
-            {!chat.group && (
-              <span className="text-caption text-[#8fa1ae]">
-                {chat.online ? "●  Online now" : lastSeenLabel(chat.lastSeen)}
-              </span>
-            )}
-          </div>
-        )}
-        <button
-          className="icon-button"
-          aria-label={search.isOpen ? "Close search" : "Search messages"}
-          title={search.isOpen ? "Close search" : "Search messages"}
-          aria-expanded={search.isOpen}
-          onClick={() => {
-            if (search.isOpen) search.close();
-            else search.open();
-          }}
-        >
-          {search.isOpen ? (
-            <LuX className="size-[17px]" />
-          ) : (
-            <LuSearch className="size-[18px]" />
-          )}
-        </button>
-        <div className="relative">
-          <button
-            className="icon-button"
-            aria-label="More options"
-            onClick={() => {
-              search.close();
-              setMenuOpen(!menuOpen);
-            }}
-          >
-            <LuEllipsisVertical className="size-[18px]" />
-          </button>
-          {menuOpen && (
-            <div className="absolute top-11 right-0 z-10 w-56 rounded-lg border border-chat-border bg-[#1c2934] p-1.5 shadow-xl">
-              <button
-                className="block w-full rounded-md px-3 py-2 text-left text-xs hover:bg-[#2a3946]"
-                onClick={() => {
-                  onToggleArchive();
-                  setMenuOpen(false);
-                }}
-              >
-                {archived ? "Unarchive chat" : "Archive chat"}
-              </button>
-              <button
-                className="block w-full rounded-md px-3 py-2 text-left text-xs hover:bg-[#2a3946]"
-                onClick={() => {
-                  onToggleNotifications();
-                  setMenuOpen(false);
-                }}
-              >
-                {notificationsOff ? "Turn notifications on" : "Turn notifications off"}
-              </button>
-              <button
-                className="block w-full rounded-md px-3 py-2 text-left text-xs hover:bg-[#2a3946]"
-                onClick={() => {
-                  onToggleDeletedMessages();
-                  setMenuOpen(false);
-                }}
-              >
-                {showDeletedMessages
-                  ? "Hide deleted messages"
-                  : "Show deleted messages"}
-              </button>
-            </div>
-          )}
         </div>
       </div>
-    </div>
-  </div>
-  </header>
-);
+    </header>
+  );
+};
