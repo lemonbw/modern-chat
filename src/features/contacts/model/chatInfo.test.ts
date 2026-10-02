@@ -43,8 +43,12 @@ describe("buildTabItems", () => {
     expect(buildTabItems(messages, "music").map((item) => item.kind)).toEqual(["audio"]);
   });
 
-  it("extracts links from the text", () => {
-    expect(buildTabItems(messages, "links").map((item) => item.title)).toEqual(["https://example.com/page"]);
+  it("extracts links from the text and names them after the host", () => {
+    const links = buildTabItems(messages, "links");
+    expect(links).toHaveLength(1);
+    expect(links[0]?.url).toBe("https://example.com/page");
+    expect(links[0]?.title).toBe("example.com");
+    expect(links[0]?.kind).toBe("link");
   });
 
   it("returns nothing for stories because the API has no stories", () => {

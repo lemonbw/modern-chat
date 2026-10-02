@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage, Conversation } from "../../../entities/chat/types";
 import { getContactInfo, getGroupData } from "../../../features/contacts/api/greenApiContacts";
 import type { GreenApiContactInfo, GreenApiGroupData } from "../../../features/contacts/api/greenApiContacts";
@@ -23,6 +23,9 @@ export type InfoPanelModel = {
   totalMembers: number;
   displayName: string;
   lastSeenText: string;
+  phone: string | number | undefined;
+  username: string | undefined;
+  detailsFromChatList: boolean;
   isAvatarExpanded: boolean;
   isEditing: boolean;
   isFilterOpen: boolean;
@@ -42,11 +45,19 @@ export type InfoPanelModel = {
   setNotifications: (value: boolean) => void;
 };
 
-/** State of the info panel: which source is loaded, the tab, the media filter and local edits. */
 export const useInfoPanel = (chat: Conversation, messages: ChatMessage[]): InfoPanelModel => {
   const [contact, setContact] = useState<GreenApiContactInfo | null>(null);
   const [group, setGroup] = useState<GreenApiGroupData | null>(null);
-  const [stored, setStored] = useState<LocalProfile | null>(() => readLocalProfile(chat.id));
+  const [stored, setStored] = useState<LocalProfile | null>(null);
+  const chatIdRef = useRef(chat.id);
+
+  useEffect(() => {
+    const chatId = chat.id;
+    chatIdRef.current = chatId;
+    let isMounted = true;
+    void readLocalProfile(chatId).then((profile) => { if (isMounted) setStored(profile); }).catch(() => { if (isMounted) setStored(null); });
+    return () => { isMounted = false; };
+  }, [chat.id]);
   const [tab, setTab] = useState<InfoTab>(chat.group ? "members" : "stories");
   const [openedTab, setOpenedTab] = useState<InfoTab | null>(null);
   const [isAvatarExpanded, setIsAvatarExpanded] = useState(false);
@@ -69,7 +80,6 @@ export const useInfoPanel = (chat: Conversation, messages: ChatMessage[]): InfoP
   }, []);
 
   const members = useMemo(() => buildMembers(messages), [messages]);
-  // The API reports the real participant count; the history-derived list only fills the tab.
   const totalMembers = group?.size ?? members.length;
 
   const items = useMemo(
@@ -90,10 +100,13 @@ export const useInfoPanel = (chat: Conversation, messages: ChatMessage[]): InfoP
 
   const persist = useCallback((next: LocalProfile) => {
     setStored(next);
-    writeLocalProfile(chat.id, next);
-  }, [chat.id]);
+    void writeLocalProfile(chatIdRef.current, next);
+  }, []);
 
   const displayName = [stored?.firstName, stored?.lastName].filter(Boolean).join(" ").trim() || chat.name;
+  const phone = contact?.phoneNumber ?? chat.phoneNumber;
+  const username = contact?.username ?? chat.username;
+  const detailsFromChatList = !isGroup && contact === null;
 
   const lastSeenText = isGroup
     ? `${totalMembers} ${totalMembers === 1 ? "member" : "members"}`
@@ -108,7 +121,7 @@ export const useInfoPanel = (chat: Conversation, messages: ChatMessage[]): InfoP
     tab, openedTab, activeTab: openedTab ?? tab,
     items,
     visibleItems: isPreview ? items.slice(0, previewTiles) : items.slice(0, visibleCount),
-    members, totalMembers, displayName, lastSeenText,
+    members, totalMembers, displayName, lastSeenText, phone, username, detailsFromChatList,
     isAvatarExpanded, isEditing, isFilterOpen, showPhotos, showVideos, isPreview,
     selectTab,
     openTab,

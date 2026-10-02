@@ -28,6 +28,15 @@ export const tabLabel: Record<InfoTab, string> = {
 
 const urlPattern = /https?:\/\/[^\s<>"']+/i;
 
+/** The hostname stands in as the site name until the OpenGraph tags say something better. */
+const hostOfUrl = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+};
+
 const itemId = (message: ChatMessage, index: number) => message.id ?? `${message.timestamp ?? index}-${index}`;
 
 type MediaKind = "image" | "video" | "audio" | "document" | "sticker";
@@ -64,7 +73,14 @@ export const buildTabItems = (messages: ChatMessage[], tab: InfoTab, options: { 
     return messages.flatMap((message, index) => {
       const url = message.text.match(urlPattern)?.[0];
       if (!url) return [];
-      return [{ id: itemId(message, index), kind: "link" as const, title: url, subtitle: message.text, timestamp: message.timestamp }];
+      return [{
+        id: itemId(message, index),
+        kind: "link" as const,
+        title: hostOfUrl(url),
+        subtitle: message.text,
+        url,
+        timestamp: message.timestamp,
+      }];
     });
   }
   return [];
