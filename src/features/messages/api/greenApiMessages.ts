@@ -154,17 +154,21 @@ export const messagePreview = (item: GreenApiMessage) => (isMediaMessage(item) ?
  * GREEN-API Telegram has no unread counter, so unread is the run of incoming messages at the end
  * of the history — everything after the last message this account sent.
  */
-export const getChatSidebarInfo = async (chatId: string, count = 100): Promise<{ last?: GreenApiMessage; unread: number }> => {
+export type ChatSidebarInfo = { last?: GreenApiMessage; unread: number; unreadTruncated: boolean };
+
+export const getChatSidebarInfo = async (chatId: string, count = 100): Promise<ChatSidebarInfo> => {
   return greenApiRead("getChatHistory", `sidebar:${chatId}:${count}`, async () => {
     const { data } = await greenApiClient.post<GreenApiMessage[]>(greenApiUrl("getChatHistory"), { chatId, count });
-    if (!Array.isArray(data)) return { unread: 0 };
+    if (!Array.isArray(data)) return { unread: 0, unreadTruncated: false };
     let unread = 0;
     for (const item of data) {
       if (item.type === "outgoing") break;
       if (item.deletedMessageData) continue;
       unread += 1;
     }
-    return { last: data[0], unread };
+    // The run reaches the oldest fetched message, so older unread ones exist behind it.
+    const unreadTruncated = unread > 0 && unread >= count;
+    return { last: data[0], unread, unreadTruncated };
   });
 };
 
@@ -240,4 +244,9 @@ export const forwardChatMessage = async (chatId: string, chatIdFrom: string, mes
 
 export const deleteChatMessage = async (chatId: string, idMessage: string, onlySenderDelete: boolean) => {
   return greenApiClient.post(greenApiUrl("deleteMessage"), { chatId, idMessage, onlySenderDelete });
+};
+
+/** "Mark a chat as read": the server-side read mark behind the cleared sidebar counter. */
+export const markChatAsRead = async (chatId: string) => {
+  await greenApiClient.post(greenApiUrl("readChat"), { chatId });
 };

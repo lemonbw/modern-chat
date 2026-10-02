@@ -6,6 +6,7 @@ export type ChatPreviewPatch = {
   preview?: string;
   timestamp?: number;
   unread?: number;
+  unreadTruncated?: boolean;
   sender?: string;
 };
 
@@ -15,10 +16,11 @@ const formatTime = (timestamp?: number) =>
     : "";
 
 /**
- * Fills the sidebar for every chat that was not opened. Each chat costs one history request that
- * carries both the newest message and the unread run, so the list fills at the pace of the
- * GREEN-API rate limit instead of two requests per chat.
+ * One request per background chat, no full history: the newest message feeds the sidebar row and
+ * the run of incoming messages at its end is the unread counter GREEN-API Telegram does not expose.
  */
+export const previewMessageCount = 10;
+
 export const loadChatPreviews = async (
   chats: Conversation[],
   skipIds: Set<string>,
@@ -29,10 +31,10 @@ export const loadChatPreviews = async (
   for (const chat of pending) {
     if (isCancelled()) return;
     try {
-      const { last, unread } = await getChatSidebarInfo(chat.id);
+      const { last, unread, unreadTruncated } = await getChatSidebarInfo(chat.id, previewMessageCount);
       if (isCancelled()) return;
       if (!last) {
-        onPatch({ id: chat.id, preview: "", unread: 0 });
+        onPatch({ id: chat.id, preview: "", unread: 0, unreadTruncated: false });
         continue;
       }
       onPatch({
@@ -40,10 +42,11 @@ export const loadChatPreviews = async (
         preview: messagePreview(last),
         timestamp: last.timestamp,
         unread,
+        unreadTruncated,
         sender: chat.group ? senderNameOf(last) || undefined : undefined,
       });
     } catch {
-      // A chat without a preview stays usable, the next load retries it.
+      continue;
     }
   }
 };

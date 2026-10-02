@@ -32,12 +32,19 @@ export type Conversation = {
   preview: string;
   time: string;
   unread?: number;
+  /** True when the unread run reaches the end of the fetched window: the real count is higher. */
+  unreadTruncated?: boolean;
   lastTimestamp?: number;
   sender?: string;
   online?: boolean;
   lastSeen?: string | number | null;
+  /** getChats / getContacts return these for personal chats, unlike getContactInfo. */
+  phoneNumber?: string | number;
+  username?: string;
   avatar?: string | null;
   hasConversation?: boolean;
+  /** Notifications off for this chat: the unread badge is grey instead of blue. */
+  notificationsOff?: boolean;
   group?: boolean;
   archived?: boolean;
   messages: ChatMessage[];
