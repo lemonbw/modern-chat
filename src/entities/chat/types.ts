@@ -9,10 +9,13 @@ export type ChatMessageMedia = {
   thumbnail?: string;
 };
 
+export type OutgoingFile = { blob: Blob; fileName: string; mimeType?: string };
+
 export type ChatMessage = {
   id?: string;
   text: string;
   time: string;
+  timestamp?: number;
   mine?: boolean;
   status?: ChatMessageStatus;
   quotedText?: string;

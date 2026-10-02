@@ -1,5 +1,5 @@
-import axios from "axios";
-import type { ChatMessage, ChatMessageMedia } from "../../../entities/chat/types";
+import type { ChatMessage, ChatMessageMedia, OutgoingFile } from "../../../entities/chat/types";
+import { greenApiClient } from "../../../shared/api/greenApiClient";
 import { greenApiUrl } from "../../../shared/api/greenApiConfig";
 import { greenApiRead } from "../../../shared/api/greenApiRead";
 
@@ -35,7 +35,7 @@ const statusFromApi = (status?: string): ChatMessage["status"] => {
 
 export const getChatMessage = async (chatId: string, idMessage: string) => {
   return greenApiRead("getMessage", `${chatId}:${idMessage}`, async () => {
-    const { data } = await axios.post<GreenApiMessage>(greenApiUrl("getMessage"), { chatId, idMessage });
+    const { data } = await greenApiClient.post<GreenApiMessage>(greenApiUrl("getMessage"), { chatId, idMessage });
     return data;
   });
 };
@@ -135,9 +135,37 @@ const messageMedia = (item: GreenApiMessage): ChatMessageMedia | undefined => {
   };
 };
 
+export const messagePreview = messageText;
+
+/** Newest message of a chat, used for the sidebar preview of chats that were never opened. */
+export const getLastChatMessage = async (chatId: string): Promise<GreenApiMessage | undefined> => {
+  return greenApiRead("getChatHistory", `${chatId}:1`, async () => {
+    const { data } = await greenApiClient.post<GreenApiMessage[]>(greenApiUrl("getChatHistory"), { chatId, count: 1 });
+    return Array.isArray(data) ? data[0] : undefined;
+  });
+};
+
+/**
+ * GREEN-API Telegram does not expose unread counters, so unread is the run of incoming messages
+ * at the end of the history — everything after the last message this account sent.
+ */
+export const getChatUnreadCount = async (chatId: string, count = 100): Promise<number> => {
+  return greenApiRead("getChatHistory", `unread:${chatId}:${count}`, async () => {
+    const { data } = await greenApiClient.post<GreenApiMessage[]>(greenApiUrl("getChatHistory"), { chatId, count });
+    if (!Array.isArray(data)) return 0;
+    let unread = 0;
+    for (const item of data) {
+      if (item.type === "outgoing") break;
+      if (item.deletedMessageData) continue;
+      unread += 1;
+    }
+    return unread;
+  });
+};
+
 export const getChatMessages = async (chatId: string, count = 100): Promise<ChatMessage[]> => {
   return greenApiRead("getChatHistory", `${chatId}:${count}`, async () => {
-    const { data } = await axios.post<GreenApiMessage[]>(greenApiUrl("getChatHistory"), { chatId, count });
+    const { data } = await greenApiClient.post<GreenApiMessage[]>(greenApiUrl("getChatHistory"), { chatId, count });
     if (!Array.isArray(data)) throw new Error("Green API returned an invalid message history");
     return data
       .reverse()
@@ -156,15 +184,47 @@ export const getChatMessages = async (chatId: string, count = 100): Promise<Chat
 };
 
 export const sendChatMessage = async (chatId: string, message: string, quotedMessageId?: string) => {
-  return axios.post<{ idMessage?: string }>(greenApiUrl("sendMessage"), {
+  return greenApiClient.post<{ idMessage?: string }>(greenApiUrl("sendMessage"), {
     chatId,
     message,
     ...(quotedMessageId ? { quotedMessageId } : {}),
   });
 };
 
+export type { OutgoingFile };
+
+export const fileKind = (file: { mimeType?: string }): ChatMessageMedia["kind"] => {
+  const mimeType = file.mimeType ?? "";
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("video/")) return "video";
+  if (mimeType.startsWith("audio/")) return "audio";
+  return "document";
+};
+
+export const filePreviewLabel = (file: { mimeType?: string }) => {
+  const labels: Record<ChatMessageMedia["kind"], string> = {
+    sticker: "Sticker",
+    image: "Photo",
+    video: "Video",
+    audio: "Voice message",
+    document: "File",
+  };
+  return labels[fileKind(file)];
+};
+
+/** Uploads a photo, video, audio, voice note or document through GREEN-API `sendFileByUpload`. */
+export const sendChatFile = async (chatId: string, file: OutgoingFile, caption?: string, quotedMessageId?: string) => {
+  const form = new FormData();
+  form.append("chatId", chatId);
+  form.append("file", file.blob, file.fileName);
+  form.append("fileName", file.fileName);
+  if (caption) form.append("caption", caption);
+  if (quotedMessageId) form.append("quotedMessageId", quotedMessageId);
+  return greenApiClient.post<{ idMessage?: string; urlFile?: string }>(greenApiUrl("sendFileByUpload"), form);
+};
+
 export const forwardChatMessage = async (chatId: string, chatIdFrom: string, messageId: string) => {
-  return axios.post<{ messages?: string[] }>(greenApiUrl("forwardMessages"), {
+  return greenApiClient.post<{ messages?: string[] }>(greenApiUrl("forwardMessages"), {
     chatId,
     chatIdFrom,
     messages: [messageId],
@@ -172,5 +232,5 @@ export const forwardChatMessage = async (chatId: string, chatIdFrom: string, mes
 };
 
 export const deleteChatMessage = async (chatId: string, idMessage: string, onlySenderDelete: boolean) => {
-  return axios.post(greenApiUrl("deleteMessage"), { chatId, idMessage, onlySenderDelete });
+  return greenApiClient.post(greenApiUrl("deleteMessage"), { chatId, idMessage, onlySenderDelete });
 };
