@@ -1,3 +1,5 @@
+import { formatDateTime } from "./format";
+
 const relativeLabels: Record<string, string> = {
   online: "Online now",
   recently: "Last seen recently",
@@ -18,5 +20,5 @@ export const lastSeenLabel = (value?: string | number | null) => {
   const numericValue = Number(value);
   const date = new Date(Number.isFinite(numericValue) ? (numericValue < 100_000_000_000 ? numericValue * 1000 : numericValue) : value);
   if (Number.isNaN(date.getTime())) return "Online status hidden";
-  return `Last seen ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date)}`;
+  return `Last seen ${formatDateTime(date)}`;
 };

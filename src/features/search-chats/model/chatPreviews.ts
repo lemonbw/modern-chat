@@ -1,4 +1,5 @@
 import type { Conversation } from "../../../entities/chat/types";
+import { formatTimeOfDay } from "../../../shared/lib/format";
 import { getChatSidebarInfo, messagePreview, senderNameOf } from "../../messages/api/greenApiMessages";
 
 export type ChatPreviewPatch = {
@@ -10,10 +11,7 @@ export type ChatPreviewPatch = {
   sender?: string;
 };
 
-const formatTime = (timestamp?: number) =>
-  timestamp
-    ? new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(timestamp * 1000))
-    : "";
+const formatTime = (timestamp?: number) => (timestamp ? formatTimeOfDay(timestamp * 1000) : "");
 
 /**
  * One request per background chat, no full history: the newest message feeds the sidebar row and
