@@ -1,3 +1,5 @@
+import { LuArrowLeft } from "react-icons/lu";
+import { AppLogo } from "../../shared/ui/AppLogo";
 import { useCallback, useState } from "react";
 import LoginByQR from "../../features/auth/ui/LoginByQR";
 import LoginByPhoneNumber from "../../features/auth/ui/LoginByPhoneNumber";
@@ -31,16 +33,11 @@ export const AuthPage = ({ onSignIn, isAddingAccount = false, onCancelAddAccount
           onClick={onCancelAddAccount}
           className="fixed left-4 top-4 z-20 grid size-11 place-items-center rounded-full border border-[#40505c] bg-[#1b2632cc] text-2xl text-[#c6d2da] shadow-lg transition duration-200 hover:scale-105 hover:border-[#43b2e5] hover:bg-[#2aabee] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#43b2e5]"
         >
-          <span aria-hidden="true" className="-mt-0.5">←</span>
+          <LuArrowLeft className="size-5" aria-hidden="true" />
         </button>
       )}
       <section className="z-[1] w-[min(420px,calc(100%-36px))] rounded-2xl border border-[#354452] bg-[#1b2632f2] px-[38px] pt-9 pb-[29px] text-center shadow-[0_25px_90px_#0007,0_1px_#ffffff08_inset] max-[760px]:px-[22px] max-[760px]:pt-[29px] max-[760px]:pb-[23px]">
-        <div
-          className="mx-auto mb-[17px] grid size-[58px] place-items-center rounded-full bg-[linear-gradient(145deg,#36baf3,#1b8ecf)] text-[25px] text-white shadow-[0_10px_24px_#239ddb45]"
-          aria-hidden="true"
-        >
-          ➤
-        </div>
+        <AppLogo className="mx-auto mb-[17px] size-[58px] rounded-[15px] shadow-[0_10px_24px_#239ddb45]" />
         <h1 className="mb-[7px] text-[22px] tracking-[-.45px] text-[#f5f8fa]">
           Modern Chat
         </h1>
@@ -88,7 +85,7 @@ export const AuthPage = ({ onSignIn, isAddingAccount = false, onCancelAddAccount
             className="rounded border-0 bg-transparent px-[7px] py-[7px] text-control font-semibold text-[#51b9ed] hover:text-[#8bd5ff]"
             onClick={() => setMode("qr")}
           >
-            ← Back to QR code
+            <LuArrowLeft className="mr-1 size-[15px]" aria-hidden="true" /> Back to QR code
           </button>
         )}
         <p className="mt-[15px] text-caption text-[#738390]">

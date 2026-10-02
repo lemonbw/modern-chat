@@ -1,4 +1,6 @@
+import { LuSearch } from "react-icons/lu";
 import type { ChatFilter } from "../../model/searchChats";
+
 
 export const SearchChats = ({ query, onQueryChange, filter, onFilterChange }: {
   query: string;
@@ -8,7 +10,7 @@ export const SearchChats = ({ query, onQueryChange, filter, onFilterChange }: {
 }) => {
   return <>
     <label className="flex h-10 items-center gap-[9px] rounded-lg bg-[#242f3d] px-3 text-chat-muted">
-      <span>⌕</span>
+      <LuSearch className="size-[18px] shrink-0" aria-hidden="true" />
       <input className="w-full border-0 bg-transparent text-control text-[#e3edf3] outline-none placeholder:text-[#81909e]" aria-label="Search chats and messages" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Search chats and messages" />
     </label>
     <div className="flex gap-1.5 border-b border-chat-border px-4 pt-2.5 pb-[9px] max-[760px]:px-3 max-[760px]:py-[7px]">

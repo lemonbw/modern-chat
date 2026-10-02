@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
+import { LuMic, LuPaperclip, LuPause, LuPlay, LuSend, LuTrash2, LuX } from "react-icons/lu";
 import { VoiceWaveform } from "../../../features/messages/ui/VoiceWaveform";
 import type { useVoiceRecorder } from "../../../features/messages/model/useVoiceRecorder";
 import type { PendingFile } from "../model/useComposer";
-import { contentColumn, contentGutter } from "../lib/layout";
+import { contentGutter, contentInset, pageColumn } from "../lib/layout";
 
 type VoiceRecorder = ReturnType<typeof useVoiceRecorder>;
 
@@ -55,11 +56,11 @@ export const Composer = (props: ComposerProps) => {
 
   return (
     <div className={`border-t border-[#202d39] bg-chat ${contentGutter} pt-3 pb-[15px] max-[760px]:pt-2 max-[760px]:pb-[calc(8px+env(safe-area-inset-bottom))]`}>
-      <div className={`${contentColumn} flex flex-col`}>
+      <div className={`${pageColumn} ${contentInset} flex flex-col`}>
         {replyTarget && (
           <div className="mb-2 flex items-center gap-2 rounded-lg border-l-2 border-chat-blue bg-[#202b36] px-3 py-2 text-xs">
             <span className="min-w-0 flex-1 truncate text-[#b9c7d0]">Replying to: {replyTarget.text}</span>
-            <button type="button" className="text-[#9aabb7] hover:text-white" aria-label="Cancel reply" onClick={props.onCancelReply}>×</button>
+            <button type="button" className="text-[#9aabb7] hover:text-white" aria-label="Cancel reply" onClick={props.onCancelReply}><LuX className="size-[15px]" /></button>
           </div>
         )}
         <form className="flex min-h-[46px] w-full items-end gap-[5px] rounded-[9px] border border-[#253441] bg-[#202b36] py-[3px] pr-1.5 pl-2" onSubmit={(event) => { event.preventDefault(); props.onSubmit(); }}>
@@ -72,14 +73,14 @@ export const Composer = (props: ComposerProps) => {
             accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
             onChange={(event) => { props.onAttachFiles(event.target.files); event.target.value = ""; }}
           />
-          <button type="button" className="grid h-[35px] w-[30px] shrink-0 place-items-center rounded-full border-0 bg-transparent text-xl text-[#8fa1ae] hover:bg-[#253441] hover:text-[#dce7ed]" aria-label="Attach file" title="Attach photo, video, audio or document" onClick={() => fileInputElement.current?.click()}>📎</button>
+          <button type="button" className="grid h-[35px] w-[30px] shrink-0 place-items-center rounded-full border-0 bg-transparent text-[#8fa1ae] hover:bg-[#253441] hover:text-[#dce7ed]" aria-label="Attach file" title="Attach photo, video, audio or document" onClick={() => fileInputElement.current?.click()}><LuPaperclip className="size-[18px]" /></button>
           {voice.isActive ? (
             <>
-              <button type="button" className="grid h-[35px] w-[30px] shrink-0 place-items-center rounded-full border-0 bg-transparent text-lg text-[#e08b8b] hover:bg-[#3a2b2b]" aria-label="Discard voice message" title="Discard voice message" onClick={() => voice.cancel()}>🗑</button>
-              <button type="button" className="grid h-[35px] w-[30px] shrink-0 place-items-center rounded-full border-0 bg-transparent text-base text-[#8fa1ae] hover:bg-[#253441] hover:text-[#dce7ed]" aria-label={voice.isPlaying ? "Stop playback" : "Play the recording"} title={voice.isPlaying ? "Stop playback" : "Play the recording"} onClick={() => void voice.togglePlayback()}>{voice.isPlaying ? "❚❚" : "▶"}</button>
+              <button type="button" className="grid h-[35px] w-[30px] shrink-0 place-items-center rounded-full border-0 bg-transparent text-lg text-[#e08b8b] hover:bg-[#3a2b2b]" aria-label="Discard voice message" title="Discard voice message" onClick={() => voice.cancel()}><LuTrash2 className="size-[17px]" /></button>
+              <button type="button" className="grid h-[35px] w-[30px] shrink-0 place-items-center rounded-full border-0 bg-transparent text-base text-[#8fa1ae] hover:bg-[#253441] hover:text-[#dce7ed]" aria-label={voice.isPlaying ? "Stop playback" : "Play the recording"} title={voice.isPlaying ? "Stop playback" : "Play the recording"} onClick={() => void voice.togglePlayback()}>{voice.isPlaying ? <LuPause className="size-[15px]" /> : <LuPlay className="size-[15px]" />}</button>
               <span className="shrink-0 text-caption tabular-nums text-[#8fa1ae]">{formatElapsed(voice.elapsedMs)}</span>
               <VoiceWaveform peaks={voice.peaks} muted={voice.isPaused} />
-              <button type="button" className="grid h-[35px] w-[30px] shrink-0 place-items-center rounded-full border-0 bg-transparent text-base text-[#8fa1ae] hover:bg-[#253441] hover:text-[#dce7ed]" aria-label={voice.isPaused ? "Resume recording" : "Pause recording"} title={voice.isPaused ? "Resume recording" : "Pause recording"} onClick={() => { if (voice.isPaused) { voice.stopPlayback(); voice.resume(); } else voice.pause(); }}>{voice.isPaused ? "🎙" : "❚❚"}</button>
+              <button type="button" className="grid h-[35px] w-[30px] shrink-0 place-items-center rounded-full border-0 bg-transparent text-base text-[#8fa1ae] hover:bg-[#253441] hover:text-[#dce7ed]" aria-label={voice.isPaused ? "Resume recording" : "Pause recording"} title={voice.isPaused ? "Resume recording" : "Pause recording"} onClick={() => { if (voice.isPaused) { voice.stopPlayback(); voice.resume(); } else voice.pause(); }}>{voice.isPaused ? <LuMic className="size-[17px]" /> : <LuPause className="size-[15px]" />}</button>
             </>
           ) : (
             <textarea
@@ -101,7 +102,7 @@ export const Composer = (props: ComposerProps) => {
             title={voice.isActive ? "Send voice message" : props.hasDraft ? "Send message" : "Record voice message"}
             onClick={voice.isActive ? props.onSendVoice : props.hasDraft ? undefined : () => void voice.start()}
           >
-            {voice.isActive || props.hasDraft ? "➤" : "🎙"}
+            {voice.isActive || props.hasDraft ? <LuSend className="size-[16px]" /> : <LuMic className="size-[17px]" />}
           </button>
         </form>
         {voice.error && <p role="alert" className="mt-1 px-1 text-xs text-red-300">{voice.error}</p>}
@@ -110,7 +111,7 @@ export const Composer = (props: ComposerProps) => {
             {pendingFiles.map((file) => (
               <li key={file.id} className="flex items-center gap-2 rounded-lg border border-[#2c3b49] bg-[#1b2734] py-1 pr-1 pl-2 text-xs text-[#d7e2e9]">
                 <span className="max-w-[180px] truncate">{file.fileName}</span>
-                <button type="button" className="grid size-6 place-items-center rounded-full text-[#8fa1ae] hover:bg-[#2a3946] hover:text-white" aria-label={`Remove ${file.fileName}`} onClick={() => props.onRemoveFile(file.id)}>×</button>
+                <button type="button" className="grid size-6 place-items-center rounded-full text-[#8fa1ae] hover:bg-[#2a3946] hover:text-white" aria-label={`Remove ${file.fileName}`} onClick={() => props.onRemoveFile(file.id)}><LuX className="size-[14px]" /></button>
               </li>
             ))}
           </ul>

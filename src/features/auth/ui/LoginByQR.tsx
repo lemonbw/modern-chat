@@ -67,7 +67,6 @@ const LoginByQR = ({ onSignIn, onPasswordRequired, requireFreshAuthorization = f
           }
         }
       } catch (error) {
-        // Report polling failures in the same status area as QR failures.
         if (!controller.signal.aborted) {
           setQrState((current) => ({ ...current, message: `${greenApiErrorMessage(error, "Could not check Telegram authorization state")}. Retrying…`, loading: false }));
         }

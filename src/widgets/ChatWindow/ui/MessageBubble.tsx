@@ -1,6 +1,13 @@
 import type { ChatMessage } from "../../../entities/chat/types";
 import { MessageMedia } from "../../../features/messages/ui/MessageMedia";
-import { statusColor, statusGlyph, statusTitle } from "../lib/layout";
+import { LuCircleAlert, LuCheck, LuCheckCheck, LuClock, LuX } from "react-icons/lu";
+import { statusColor, statusTitle } from "../lib/layout";
+
+const statusIcon = (status: string) => {
+  if (status === "sending") return <LuClock className="size-[12px]" />;
+  if (status === "failed") return <LuCircleAlert className="size-[12px]" />;
+  return status === "sent" ? <LuCheck className="size-[13px]" /> : <LuCheckCheck className="size-[14px]" />;
+};
 
 type Props = {
   message: ChatMessage;
@@ -21,8 +28,8 @@ export const MessageBubble = ({ message, isGroup, onContextMenu, onAskDelete, re
     {message.deleted ? <span className="italic text-[#a3b1ba]">{message.text}</span> : message.media ? <><MessageMedia media={message.media} alt={message.media.caption || message.media.fileName || `${message.media.kind} message`} />{message.media.caption && <span className="block whitespace-pre-wrap">{message.media.caption}</span>}</> : message.text}
     <div className={`mt-[3px] flex items-center justify-end gap-1 text-micro text-[#8fa1ae] ${message.mine ? "text-[#8bc7e8]" : ""}`}>
       {message.time}
-      {message.id && !message.deleted && message.mine && <button className="ml-1 text-[#8fa1ae] hover:text-red-300" aria-label="Delete message" title="Delete message" onClick={() => onAskDelete(message)}>×</button>}
-      {message.mine && message.status && <span aria-label={message.status} title={statusTitle[message.status]} style={{ color: statusColor[message.status] }}>{statusGlyph[message.status]}</span>}
+      {message.id && !message.deleted && message.mine && <button className="ml-1 text-[#8fa1ae] hover:text-red-300" aria-label="Delete message" title="Delete message" onClick={() => onAskDelete(message)}><LuX className="size-[12px]" /></button>}
+      {message.mine && message.status && <span aria-label={message.status} title={statusTitle[message.status]} style={{ color: statusColor[message.status] }}>{statusIcon(message.status)}</span>}
     </div>
   </div>
 );
