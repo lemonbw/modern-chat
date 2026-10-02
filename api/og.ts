@@ -1,5 +1,6 @@
 import { lookup } from "node:dns/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { readSession } from "./_session.ts";
 
 /**
  * Reads the OpenGraph tags of a page so the links tab can show a title, a site name and a picture.
@@ -171,6 +172,8 @@ const fetchPreview = async (target: URL): Promise<Preview | null> => {
 };
 
 export default async (request: IncomingMessage, response: ServerResponse) => {
+  // Previews fetch third party pages from this server, so they stay behind the app session too.
+  if (!readSession(request)) return json(response, 401, { error: "Sign in to use this app", code: "session_required" });
   if (request.method !== "GET") return json(response, 405, { error: "Method not allowed" });
 
   const raw = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`).searchParams.get("url");

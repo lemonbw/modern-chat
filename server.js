@@ -24,6 +24,7 @@ const contentTypes = {
 };
 
 const proxy = await import("./dist-server/greenapi.mjs");
+const auth = await import("./dist-server/auth.mjs");
 const ogPreview = await import("./dist-server/og.mjs");
 
 const sendFile = (response, filePath, statusCode = 200) => {
@@ -64,6 +65,21 @@ const server = createServer(async (request, response) => {
   if (url.pathname === "/api/health") {
     response.setHeader("Content-Type", "application/json");
     response.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  if (url.pathname === "/api/auth") {
+    try {
+      await auth.default(request, response);
+    } catch (error) {
+      if (!response.headersSent) {
+        response.statusCode = 500;
+        response.setHeader("Content-Type", "application/json");
+        response.end(JSON.stringify({ error: error instanceof Error ? error.message : "Auth error" }));
+      } else {
+        response.end();
+      }
+    }
     return;
   }
 

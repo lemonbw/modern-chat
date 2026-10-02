@@ -1,15 +1,26 @@
 import { PassThrough } from "node:stream";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { proxyHandler } from "./[method].ts";
+import { parseCookies, SESSION_COOKIE, sessionCookie, WRITE_COOKIE, writeCookie } from "../_session.ts";
+import { proxyHandler, readOnlyMethods } from "./[method].ts";
 
 type StubRequest = IncomingMessage & PassThrough & { method: string; url: string };
+
+const cookieValue = (header: string, name: string) => parseCookies(header.split(";")[0])[name];
+const sessionCookieHeader = () => `${SESSION_COOKIE}=${cookieValue(sessionCookie({ headers: { host: "localhost:5173" } } as IncomingMessage), SESSION_COOKIE)}`;
+const writeCookieHeader = () => `${WRITE_COOKIE}=${cookieValue(writeCookie({ headers: { host: "localhost:5173" } } as IncomingMessage), WRITE_COOKIE)}`;
+const sessionAndWrite = () => `${sessionCookieHeader()}; ${writeCookieHeader()}`;
 
 const createRequest = (url: string, method = "GET", body = "", headers: Record<string, string> = {}): StubRequest => {
   const stream = new PassThrough() as unknown as StubRequest;
   stream.method = method;
   stream.url = url;
-  stream.headers = { accept: "application/json", host: "localhost:5173", ...headers } as unknown as IncomingMessage["headers"];
+  stream.headers = {
+    accept: "application/json",
+    host: "localhost:5173",
+    ...(headers.cookie === undefined ? { cookie: sessionCookieHeader() } : {}),
+    ...headers,
+  } as unknown as IncomingMessage["headers"];
   if (body) {
     stream.headers["content-type"] = "application/json";
     process.nextTick(() => {
@@ -47,6 +58,10 @@ beforeEach(() => {
   process.env.GREEN_API_URL = "https://api.green-api.com";
   process.env.GREEN_API_INSTANCE = "1100000000";
   process.env.GREEN_API_TOKEN = "secret-token";
+  process.env.APP_PASSWORD = "open-sesame";
+  process.env.SESSION_SECRET = "test-secret";
+  delete process.env.WRITE_PASSWORD;
+  delete process.env.APP_ALLOW_WRITES;
   upstreamMock.mockReset();
   upstreamMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } }));
   vi.stubGlobal("fetch", upstreamMock);
@@ -71,7 +86,7 @@ describe("green api proxy", () => {
   });
 
   it("forwards the body of a post", async () => {
-    await proxyHandler(createRequest("/api/greenapi/sendMessage", "POST", JSON.stringify({ chatId: "1" })), createResponse() as ServerResponse, "sendMessage", "");
+    await proxyHandler(createRequest("/api/greenapi/sendMessage", "POST", JSON.stringify({ chatId: "1" }), { cookie: sessionAndWrite() }), createResponse() as ServerResponse, "sendMessage", "");
     const [, init] = upstreamMock.mock.calls[0] as [string, RequestInit];
     expect(Buffer.from(init.body as Buffer).toString()).toContain('"chatId":"1"');
   });
@@ -132,7 +147,7 @@ describe("green api proxy", () => {
 
   it("rejects a body larger than one megabyte", async () => {
     const response = createResponse();
-    await expect(proxyHandler(createRequest("/api/greenapi/sendMessage", "POST", "x".repeat(1024 * 1024 + 64)), response as ServerResponse, "sendMessage", ""))
+    await expect(proxyHandler(createRequest("/api/greenapi/sendMessage", "POST", "x".repeat(1024 * 1024 + 64), { cookie: sessionAndWrite() }), response as ServerResponse, "sendMessage", ""))
       .rejects.toThrow();
     expect(upstreamMock).not.toHaveBeenCalled();
   });
@@ -141,5 +156,56 @@ describe("green api proxy", () => {
     const response = createResponse();
     await proxyHandler(createRequest("/api/greenapi/getChats", "TRACE"), response as ServerResponse, "getChats", "");
     expect(response.statusCode).toBe(405);
+  });
+});
+
+describe("the app gate", () => {
+  it("refuses a read call without a session, so curl is no enough", async () => {
+    const response = createResponse();
+    await proxyHandler(createRequest("/api/greenapi/getChats", "GET", "", { cookie: "" }), response as ServerResponse, "getChats", "");
+    expect(response.statusCode).toBe(401);
+    expect(response.setHeader).toHaveBeenCalledWith("WWW-Authenticate", expect.stringContaining("Session"));
+    expect(JSON.parse(response.body()).code).toBe("session_required");
+    expect(upstreamMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a forged session", async () => {
+    const response = createResponse();
+    await proxyHandler(createRequest("/api/greenapi/getChats", "GET", "", { cookie: `${SESSION_COOKIE}=forged` }), response as ServerResponse, "getChats", "");
+    expect(response.statusCode).toBe(401);
+    expect(upstreamMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the state changing calls out of a plain session", async () => {
+    const response = createResponse();
+    await proxyHandler(createRequest("/api/greenapi/logout"), response as ServerResponse, "logout", "");
+    expect(response.statusCode).toBe(403);
+    expect(JSON.parse(response.body()).code).toBe("write_grant_required");
+    expect(upstreamMock).not.toHaveBeenCalled();
+  });
+
+  it("lets a write grant through", async () => {
+    const response = createResponse();
+    await proxyHandler(createRequest("/api/greenapi/logout", "GET", "", { cookie: sessionAndWrite() }), response as ServerResponse, "logout", "");
+    expect(response.statusCode).toBe(200);
+    expect(upstreamMock).toHaveBeenCalledOnce();
+  });
+
+  it("reports a read only deployment instead of asking for a password", async () => {
+    process.env.APP_ALLOW_WRITES = "false";
+    const response = createResponse();
+    await proxyHandler(createRequest("/api/greenapi/sendMessage", "GET", "", { cookie: sessionAndWrite() }), response as ServerResponse, "sendMessage", "");
+    expect(response.statusCode).toBe(403);
+    expect(JSON.parse(response.body()).code).toBe("writes_disabled");
+    expect(upstreamMock).not.toHaveBeenCalled();
+  });
+
+  it("lists the read methods and treats everything else as a mutation", () => {
+    for (const method of ["getChats", "getChatHistory", "getContacts", "getContactInfo", "getAvatar", "getMessage", "getAccountSettings", "getStateInstance", "getGroupData", "qr", "checkAccount", "startAuthorization", "sendAuthorizationCode", "sendAuthorizationPassword"]) {
+      expect(readOnlyMethods.has(method)).toBe(true);
+    }
+    for (const method of ["logout", "sendMessage", "deleteMessage", "forwardMessages", "readChat", "addContact", "deleteContact", "createGroup", "archiveChat", "unarchiveChat", "uploadFile", "sendFileByUpload"]) {
+      expect(readOnlyMethods.has(method)).toBe(false);
+    }
   });
 });

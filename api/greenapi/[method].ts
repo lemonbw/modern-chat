@@ -1,8 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { hasWriteGrant, readSession, writesEnabled } from "../_session.ts";
 
 /**
  * Proxies the browser calls to GREEN-API so the instance token never reaches the client bundle.
  * The browser only ever sends a method name; the credential stays in the server environment.
+ * Every call needs a valid app session, and only the read methods run without the write grant.
  */
 
 type Env = {
@@ -10,6 +12,24 @@ type Env = {
   GREEN_API_INSTANCE?: string;
   GREEN_API_TOKEN?: string;
 };
+
+/** Everything that only reads. Anything not listed here can change state and needs the write grant. */
+export const readOnlyMethods = new Set([
+  "qr",
+  "getStateInstance",
+  "getAccountSettings",
+  "checkAccount",
+  "startAuthorization",
+  "sendAuthorizationCode",
+  "sendAuthorizationPassword",
+  "getChats",
+  "getContacts",
+  "getContactInfo",
+  "getGroupData",
+  "getAvatar",
+  "getChatHistory",
+  "getMessage",
+]);
 
 const methodNamePattern = /^[A-Za-z][A-Za-z0-9]{0,63}$/;
 const safeMethods = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]);
@@ -60,10 +80,12 @@ const isSameOrigin = (request: IncomingMessage) => {
   }
 };
 
-const writeError = (response: ServerResponse, status: number, message: string) => {
+const writeError = (response: ServerResponse, status: number, message: string, code?: string) => {
   response.statusCode = status;
   response.setHeader("Content-Type", "application/json");
-  response.end(JSON.stringify({ error: message }));
+  response.setHeader("Cache-Control", "no-store");
+  if (status === 401) response.setHeader("WWW-Authenticate", 'Session realm="modern-chat", charset="UTF-8"');
+  response.end(JSON.stringify({ error: message, ...(code ? { code } : {}) }));
 };
 
 const handler = async (request: IncomingMessage, response: ServerResponse, method: string | undefined, search: string) => {
@@ -78,6 +100,16 @@ const handler = async (request: IncomingMessage, response: ServerResponse, metho
 
   if (!isSameOrigin(request)) {
     return writeError(response, 403, "Cross origin requests are not allowed");
+  }
+
+  // The header tells the client this was the app gate answering, not GREEN-API refusing a token.
+  if (!readSession(request)) {
+    return writeError(response, 401, "Sign in to use this app", "session_required");
+  }
+
+  if (!readOnlyMethods.has(method)) {
+    if (!writesEnabled()) return writeError(response, 403, "This deployment is read only", "writes_disabled");
+    if (!hasWriteGrant(request)) return writeError(response, 403, "This action needs the write password", "write_grant_required");
   }
 
   const env = process.env as Env;

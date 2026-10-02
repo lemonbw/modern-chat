@@ -1,11 +1,19 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { parseCookies, SESSION_COOKIE, sessionCookie } from "./_session.ts";
 
 const lookupMock = vi.fn();
 
 vi.mock("node:dns/promises", () => ({ default: { lookup: (...args: unknown[]) => lookupMock(...args) }, lookup: (...args: unknown[]) => lookupMock(...args) }));
 
 const ogPreview = (await import("./og.ts")).default;
+
+const sessionCookieValue = () => {
+  process.env.APP_PASSWORD = "open-sesame";
+  process.env.SESSION_SECRET = "test-secret";
+  const header = sessionCookie({ headers: { host: "localhost:5173" } } as IncomingMessage);
+  return `${SESSION_COOKIE}=${parseCookies(header.split(";")[0])[SESSION_COOKIE]}`;
+};
 
 type StubResponse = ServerResponse & { statusCode: number; body: string };
 
@@ -43,7 +51,7 @@ describe("open graph preview", () => {
       headers: { "content-type": "text/html; charset=utf-8" },
     })));
     const response = createResponse();
-    await ogPreview({ method: "GET", url: "/api/og?url=https://example.com/article", headers: {} } as IncomingMessage, response as ServerResponse);
+    await ogPreview({ method: "GET", url: "/api/og?url=https://example.com/article", headers: { host: "localhost:5173", cookie: sessionCookieValue() } } as IncomingMessage, response as ServerResponse);
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body()).title).toBe("A public page");
   });
@@ -53,7 +61,7 @@ describe("open graph preview", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const response = createResponse();
-    await ogPreview({ method: "GET", url: "/api/og?url=http://intranet.local/", headers: {} } as IncomingMessage, response as ServerResponse);
+    await ogPreview({ method: "GET", url: "/api/og?url=http://intranet.local/", headers: { host: "localhost:5173", cookie: sessionCookieValue() } } as IncomingMessage, response as ServerResponse);
     expect(response.statusCode).toBe(204);
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -67,20 +75,29 @@ describe("open graph preview", () => {
     }));
     vi.stubGlobal("fetch", fetchMock);
     const response = createResponse();
-    await ogPreview({ method: "GET", url: "/api/og?url=https://example.com/start", headers: {} } as IncomingMessage, response as ServerResponse);
+    await ogPreview({ method: "GET", url: "/api/og?url=https://example.com/start", headers: { host: "localhost:5173", cookie: sessionCookieValue() } } as IncomingMessage, response as ServerResponse);
     expect(response.statusCode).toBe(204);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("refuses a protocol it cannot read", async () => {
     const response = createResponse();
-    await ogPreview({ method: "GET", url: "/api/og?url=file:///etc/passwd", headers: {} } as IncomingMessage, response as ServerResponse);
+    await ogPreview({ method: "GET", url: "/api/og?url=file:///etc/passwd", headers: { host: "localhost:5173", cookie: sessionCookieValue() } } as IncomingMessage, response as ServerResponse);
     expect(response.statusCode).toBe(400);
   });
 
   it("refuses a missing url", async () => {
     const response = createResponse();
-    await ogPreview({ method: "GET", url: "/api/og", headers: {} } as IncomingMessage, response as ServerResponse);
+    await ogPreview({ method: "GET", url: "/api/og", headers: { host: "localhost:5173", cookie: sessionCookieValue() } } as IncomingMessage, response as ServerResponse);
     expect(response.statusCode).toBe(400);
+  });
+
+  it("refuses a preview without a session, so the server is not an open fetcher", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = createResponse();
+    await ogPreview({ method: "GET", url: "/api/og?url=https://example.com/article", headers: { host: "localhost:5173" } } as IncomingMessage, response as ServerResponse);
+    expect(response.statusCode).toBe(401);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
