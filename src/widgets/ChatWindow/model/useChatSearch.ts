@@ -3,7 +3,6 @@ import type { ChatMessage } from "../../../entities/chat/types";
 
 const maxResults = 40;
 
-/** In-chat search: keeps the query, the matching list and the closing rules of the search field. */
 export const useChatSearch = (messages: ChatMessage[]) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");

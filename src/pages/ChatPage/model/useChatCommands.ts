@@ -77,7 +77,6 @@ export const useChatCommands = ({ isDemo, selected, onLoadError, onPatchChat, on
     }
   }, [appendMessage, isDemo, onLoadError, onLockPreview, onPatchChat, patchMessage, selected]);
 
-  /** Files go one by one so GREEN-API keeps the queue order and its rate limits are respected. */
   const sendFiles = useCallback(async (files: OutgoingFile[], quotedMessage?: ChatMessage, caption?: string) => {
     for (const [index, file] of files.entries()) {
       await sendFile(file, files.length === 1 ? caption : undefined, quotedMessage);
