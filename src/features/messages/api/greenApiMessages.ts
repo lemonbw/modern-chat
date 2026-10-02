@@ -175,6 +175,7 @@ export const getChatMessages = async (chatId: string, count = 100): Promise<Chat
         time: item.timestamp
           ? new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(item.timestamp * 1000))
           : "",
+        timestamp: item.timestamp,
         mine: item.type === "outgoing",
         status: item.type === "outgoing" ? statusFromApi(item.statusMessage) : undefined,
         deleted: item.typeMessage === "deletedMessage",
