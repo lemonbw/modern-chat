@@ -6,6 +6,8 @@ import type { ContactDialogMode } from "../ui/NewMessageDialog";
 type SelectChat = (id: string, preferredName?: string) => Promise<void>;
 const errorMessage = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback;
 
+export type ContactManagerModel = ReturnType<typeof useContactManager>;
+
 export const useContactManager = (enabled = true) => {
   const [dialog, setDialog] = useState<ContactDialogMode>("closed");
   const [contacts, setContacts] = useState<GreenApiContact[]>([]);
