@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { ChatMessage } from "../../../entities/chat/types";
 import { messageDateLabel, messageDayKey } from "../../../shared/lib/messageDate";
-import { contentColumn, contentGutter } from "../lib/layout";
+import { contentGutter, contentInset, pageColumn } from "../lib/layout";
 import { MessageBubble } from "./MessageBubble";
 
 type Props = {
@@ -12,6 +12,8 @@ type Props = {
   isGroup?: boolean;
   topDateLabel: string;
   registerList: (element: HTMLDivElement | null) => void;
+  registerSentinel: (element: HTMLDivElement | null) => void;
+  hasMore: boolean;
   onScroll: () => void;
   onWheel: (event: { deltaY: number }) => void;
   onContextMenu: (event: React.MouseEvent<HTMLDivElement>, message: ChatMessage) => void;
@@ -20,14 +22,15 @@ type Props = {
 };
 
 /** Scrolling wall of messages with sticky date separators and a floating top date. */
-export const MessageWall = ({ messages, visibleMessages, isLoading, isLoadingOlder, isGroup, topDateLabel, registerList, onScroll, onWheel, onContextMenu, onAskDelete, registerBubble }: Props) => (
+export const MessageWall = ({ messages, visibleMessages, isLoading, isLoadingOlder, isGroup, topDateLabel, registerList, registerSentinel, hasMore, onScroll, onWheel, onContextMenu, onAskDelete, registerBubble }: Props) => (
   <div
     ref={registerList}
     onScroll={onScroll}
     onWheel={onWheel}
     className={`message-wallpaper flex flex-1 flex-col overflow-auto ${contentGutter} py-6 max-[760px]:py-[17px]`}
   >
-    <div className={`${contentColumn} flex flex-col gap-[9px]`}>
+    <div className={`${pageColumn} ${contentInset} flex flex-col gap-[9px]`}>
+      {hasMore && <div ref={registerSentinel} aria-hidden className="h-px w-full shrink-0" />}
       {visibleMessages.length > 0 && (
         <div className="sticky top-0 z-[1] self-center rounded-[14px] bg-[#182532d9] px-[11px] py-[5px] text-caption text-[#d3dde4] shadow-[0_1px_4px_#0003]">
           {topDateLabel}

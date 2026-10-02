@@ -16,11 +16,13 @@ export type ChatWindowProps = {
   isLoadingMessages: boolean;
   hasMoreMessages: boolean;
   isLoadingOlderMessages: boolean;
-  onLoadOlderMessages: () => void;
+  onLoadOlderMessages: () => Promise<boolean>;
   onSend: (text: string, quotedMessage?: ChatMessage) => void;
   onSendFiles: (files: OutgoingFile[], quotedMessage?: ChatMessage, caption?: string) => void;
   onBack: () => void;
   onToggleArchive: () => void;
+  onToggleNotifications: () => void;
+  notificationsOff: boolean;
   onDeleteMessage: (message: ChatMessage, onlySenderDelete: boolean) => Promise<void>;
   onToggleDeletedMessages: () => void;
   onForwardMessage: (message: ChatMessage, destinationChatId: string) => Promise<void>;
@@ -30,9 +32,8 @@ export type ChatWindowProps = {
   error: string | null;
 };
 
-/** Composes the chat column with the optional info panel that opens next to it. */
 export const ChatWindow = (props: ChatWindowProps) => {
-  const { chat, messages, isLoadingMessages, hasMoreMessages, isLoadingOlderMessages, onLoadOlderMessages, onSend, onSendFiles, onBack, onToggleArchive, onDeleteMessage, onToggleDeletedMessages, onForwardMessage, forwardingTargets, showDeletedMessages, archived, error } = props;
+  const { chat, messages, isLoadingMessages, hasMoreMessages, isLoadingOlderMessages, onLoadOlderMessages, onSend, onSendFiles, onBack, onToggleArchive, onToggleNotifications, notificationsOff, onDeleteMessage, onToggleDeletedMessages, onForwardMessage, forwardingTargets, showDeletedMessages, archived, error } = props;
   const [menuOpen, setMenuOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [focusSignal, setFocusSignal] = useState(0);
@@ -67,6 +68,8 @@ export const ChatWindow = (props: ChatWindowProps) => {
           onBack={onBack}
           onOpenInfo={() => setIsInfoOpen(true)}
           onToggleArchive={onToggleArchive}
+          notificationsOff={notificationsOff}
+          onToggleNotifications={onToggleNotifications}
           onToggleDeletedMessages={onToggleDeletedMessages}
           search={search}
           onJumpToMessage={(index) => { wall.scrollToIndex(index); search.close(); setFocusSignal((value) => value + 1); }}
@@ -82,6 +85,8 @@ export const ChatWindow = (props: ChatWindowProps) => {
           isGroup={chat.group}
           topDateLabel={wall.topDateLabel}
           registerList={wall.registerList}
+          registerSentinel={wall.registerSentinel}
+          hasMore={hasMoreMessages}
           onScroll={wall.onScroll}
           onWheel={wall.onWheel}
           onContextMenu={actions.openMessageMenu}

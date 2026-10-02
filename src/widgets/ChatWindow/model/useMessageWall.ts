@@ -8,8 +8,19 @@ type WallOptions = {
   isLoading: boolean;
   isLoadingOlder: boolean;
   hasMore: boolean;
-  onLoadOlder: () => void;
+  onLoadOlder: () => Promise<boolean>;
 };
+
+/** Pages one trigger may pull at once, so one drag cannot flood the API. */
+const olderBatchLimit = 2;
+
+/** The observer fires this early, the same distance the geometry check below allows. */
+const loadAhead = 160;
+
+/** Two frames: the first commits the prepended page, the second lets the scroll anchor settle. */
+const afterPagePainted = () => new Promise<void>((resolve) => {
+  requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+});
 
 /**
  * Scroll behaviour of the message wall: sticks to the bottom for new messages, keeps the reading
@@ -61,26 +72,55 @@ export const useMessageWall = ({ chatId, messages, isLoading, isLoadingOlder, ha
     if (!isLoadingOlder && olderAnchor.current) olderAnchor.current = null;
   }, [isLoadingOlder]);
 
-  const loadOlder = useCallback(() => {
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const isTopInView = useCallback(() => {
+    const list = listElement.current;
+    const sentinel = sentinelRef.current;
+    if (!list || !sentinel) return false;
+    const sentinelRect = sentinel.getBoundingClientRect();
+    const listRect = list.getBoundingClientRect();
+    return sentinelRect.top >= listRect.top - loadAhead && sentinelRect.bottom <= listRect.bottom + loadAhead;
+  }, []);
+
+  const loadOlder = useCallback(async () => {
     const list = listElement.current;
     if (!list || !hasMore || isLoadingOlder || olderAnchor.current) return;
-    olderAnchor.current = { scrollHeight: list.scrollHeight, scrollTop: list.scrollTop };
-    stickToBottom.current = false;
-    onLoadOlder();
-  }, [hasMore, isLoadingOlder, onLoadOlder]);
+    for (let page = 0; page < olderBatchLimit; page += 1) {
+      if (!isTopInView()) break;
+      olderAnchor.current = { scrollHeight: list.scrollHeight, scrollTop: list.scrollTop };
+      stickToBottom.current = false;
+      const hasMoreLeft = await onLoadOlder();
+      await afterPagePainted();
+      if (!hasMoreLeft) break;
+    }
+  }, [hasMore, isLoadingOlder, isTopInView, onLoadOlder]);
+
+  useEffect(() => {
+    const list = listElement.current;
+    const sentinel = sentinelRef.current;
+    if (!list || !sentinel) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) void loadOlder();
+    }, { root: list, rootMargin: `${loadAhead}px 0px` });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [chatId, hasMore, isLoadingOlder, loadOlder]);
 
   const onScroll = useCallback(() => {
     const list = listElement.current;
     if (!list) return;
     stickToBottom.current = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
-    if (list.scrollTop <= 32) loadOlder();
     updateTopDate();
-  }, [loadOlder, updateTopDate]);
+  }, [updateTopDate]);
 
   const onWheel = useCallback((event: { deltaY: number }) => {
-    const list = listElement.current;
-    if (event.deltaY < 0 && list && list.scrollTop <= 32) loadOlder();
-  }, [loadOlder]);
+    if (event.deltaY < 0) stickToBottom.current = false;
+  }, []);
+
+  const registerSentinel = useCallback((element: HTMLDivElement | null) => {
+    sentinelRef.current = element;
+  }, []);
 
   const registerBubble = useCallback((index: number, timestamp?: number) => (element: HTMLDivElement | null) => {
     bubbleRefs.current[index] = element;
@@ -93,6 +133,7 @@ export const useMessageWall = ({ chatId, messages, isLoading, isLoadingOlder, ha
 
   return {
     registerList,
+    registerSentinel,
     topDateLabel,
     updateTopDate,
     onScroll,

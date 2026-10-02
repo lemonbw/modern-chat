@@ -46,7 +46,7 @@ export const persistDeletedMessageIds = (deletedIds: Record<string, string[]>) =
   try {
     localStorage.setItem(deletedMessagesStorageKey, JSON.stringify(deletedIds));
   } catch {
-    // Storage may be unavailable; deletions still apply for this session.
+    return {};
   }
 };
 
@@ -54,7 +54,7 @@ export const rememberSelectedChat = (chatId: string) => {
   try {
     window.localStorage.setItem(lastSelectedChatStorageKey, chatId);
   } catch {
-    // Ignore storage failures, the chat still opens.
+    return {};
   }
 };
 

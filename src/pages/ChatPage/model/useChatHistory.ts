@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "../../../entities/chat/types";
 import { getChatMessages } from "../../../features/messages/api/greenApiMessages";
+import { readHistoryCache, writeHistoryCache } from "../../../features/messages/model/historyCache";
 import {
   errorMessage,
   historyPageSize,
@@ -33,6 +34,22 @@ export const useChatHistory = ({ isDemo, selected, onLoadError, onLatestMessage 
   const deletedMessageIds = useRef(loadDeletedMessageIds());
 
   useEffect(() => { messagesRef.current = messages; }, [messages]);
+
+
+  const cachedSignatures = useRef(new Map<string, string>());
+  useEffect(() => {
+    if (isDemo) return;
+    const timer = window.setTimeout(() => {
+      for (const [chatId, list] of Object.entries(messages)) {
+        if (list.length === 0) continue;
+        const signature = `${list.length}:${list[0]?.id ?? ""}:${list[list.length - 1]?.id ?? ""}`;
+        if (cachedSignatures.current.get(chatId) === signature) continue;
+        cachedSignatures.current.set(chatId, signature);
+        void writeHistoryCache(chatId, list);
+      }
+    }, 1_500);
+    return () => window.clearTimeout(timer);
+  }, [isDemo, messages]);
 
   const updateHistoryPage = useCallback((chatId: string, page: HistoryPage) => {
     historyPagesRef.current.set(chatId, page);
@@ -73,6 +90,20 @@ export const useChatHistory = ({ isDemo, selected, onLoadError, onLatestMessage 
     onMediaStageStart?.();
     if (otherMedia.length > 0) publishStage(chronological([...textMessages, ...stickerMessages, ...otherMedia]));
   }, []);
+
+  // The cache is the fast path: cached messages paint first, the network refresh only merges on top.
+  useEffect(() => {
+    if (isDemo || !selected) return;
+    const chatId = selected;
+    let isMounted = true;
+    void readHistoryCache(chatId).then((cached) => {
+      if (!isMounted || cached.length === 0) return;
+      publishHistory(chatId, cached);
+      const page = historyPagesRef.current.get(chatId);
+      updateHistoryPage(chatId, { count: Math.max(page?.count ?? 0, cached.length), hasMore: true, loadingOlder: false });
+    }).catch(() => undefined);
+    return () => { isMounted = false; };
+  }, [isDemo, publishHistory, selected, updateHistoryPage]);
 
   const markLoaded = useCallback((chatId: string) => { loadedHistoryIds.current.add(chatId); }, []);
   const isLoaded = useCallback((chatId: string) => loadedHistoryIds.current.has(chatId), []);
@@ -118,20 +149,30 @@ export const useChatHistory = ({ isDemo, selected, onLoadError, onLatestMessage 
     return () => { isMounted = false; window.clearInterval(interval); };
   }, [isDemo, onLatestMessage, onLoadError, publishHistory, publishInStages, selected, updateHistoryPage]);
 
-  const loadOlderMessages = useCallback(async () => {
-    if (isDemo || !selected) return;
+  const pendingOlderRef = useRef(false);
+
+  /** Loads exactly one older page and reports whether the chat still has older messages. */
+  const loadOlderMessages = useCallback(async (): Promise<boolean> => {
+    if (isDemo || !selected) return false;
     const chatId = selected;
+    if (pendingOlderRef.current) return false;
     const currentPage = historyPagesRef.current.get(chatId);
-    if (!currentPage?.hasMore || currentPage.loadingOlder) return;
+    if (!currentPage?.hasMore || currentPage.loadingOlder) return false;
+    pendingOlderRef.current = true;
     const nextCount = currentPage.count + historyPageSize;
     updateHistoryPage(chatId, { ...currentPage, loadingOlder: true });
     try {
       const result = await getChatMessages(chatId, nextCount);
       publishHistory(chatId, result);
-      updateHistoryPage(chatId, { count: nextCount, hasMore: result.length >= nextCount, loadingOlder: false });
+      const page = { count: nextCount, hasMore: result.length >= nextCount, loadingOlder: false };
+      updateHistoryPage(chatId, page);
+      return page.hasMore;
     } catch (error) {
       updateHistoryPage(chatId, { ...currentPage, loadingOlder: false });
       if (selected === chatId) onLoadError(errorMessage(error, "Could not load older messages"));
+      return false;
+    } finally {
+      pendingOlderRef.current = false;
     }
   }, [isDemo, onLoadError, publishHistory, selected, updateHistoryPage]);
 
