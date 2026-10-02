@@ -44,8 +44,6 @@ export const useChatPage = (isDemo = false) => {
     setChats((current) => current.map((chat) => chat.id === chatId ? { ...chat, ...patch } : chat));
   }, []);
 
-  // Stable on purpose: the polling effect depends on it, and a fresh function every render would
-  // restart the fifteen second timer and refetch the history on every render.
   const onLatestMessage = useCallback((chatId: string, message: ChatMessage) => {
     patchChat(chatId, { preview: message.text, time: message.time });
   }, [patchChat]);
@@ -119,6 +117,7 @@ export const useChatPage = (isDemo = false) => {
     toggleArchive: selection.toggleArchive,
     toggleNotifications: selection.toggleNotifications,
     loadOlderMessages: history.loadOlderMessages,
+    retry: list.retry,
     showDeletedMessages,
     toggleDeletedMessages,
   };

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import type { ChatMessage, Conversation } from "../../../entities/chat/types";
 import { getChatMessages, markChatAsRead } from "../../../features/messages/api/greenApiMessages";
 import { searchChats } from "../../../features/search-chats/api/greenApiChats";
@@ -6,7 +6,7 @@ import { withMuteState } from "../../../features/search-chats/model/mutedChats";
 import { loadChatPreviews, previewTimeLabel } from "../../../features/search-chats/model/chatPreviews";
 import { errorMessage, initialHistorySize, rememberSelectedChat, type HistoryPage } from "./chatPageState";
 
-/** The slice of the history hook the list needs: it opens the first chat and feeds the sidebar rows. */
+/** The slice of the history hook the chat list needs. */
 export type ChatListHistory = {
   setIsLoadingMessages: (value: boolean) => void;
   markLoaded: (chatId: string) => void;
@@ -19,14 +19,12 @@ export type ChatListHistory = {
 type Options = {
   isDemo: boolean;
   history: ChatListHistory;
-  /** The list state lives in the page hook; this hook only fills it. */
   chats: Conversation[];
   setChats: Dispatch<SetStateAction<Conversation[]>>;
   isLoadingChats: boolean;
   setIsLoadingChats: Dispatch<SetStateAction<boolean>>;
   patchChat: (chatId: string, patch: Partial<Conversation>) => void;
   initialChatIdRef: MutableRefObject<string | null>;
-  /** Both forms on purpose: the value drives the effects, the ref reads the freshest one inside them. */
   selected: string | null;
   selectedRef: MutableRefObject<string | null>;
   onOpenChat: (chatId: string) => void;
@@ -38,6 +36,7 @@ type Options = {
  * with its newest message. Split out of `useChatPage` because it is the part that talks to the API.
  */
 export const useChatList = ({ isDemo, history, chats, setChats, isLoadingChats, setIsLoadingChats, patchChat, initialChatIdRef, selected, selectedRef, onOpenChat, onLoadError }: Options) => {
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const previewLoadedIds = useRef(new Set<string>());
   const previewBlockedIds = useRef(new Set<string>());
   const previewRunRef = useRef(false);
@@ -154,9 +153,19 @@ export const useChatList = ({ isDemo, history, chats, setChats, isLoadingChats, 
     void loadInitialView();
     return () => { isMounted = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDemo]);
+  }, [isDemo, loadAttempt]);
+
+  /** Runs the whole initial screen again, for the retry button of the error state. */
+  const retry = useCallback(() => {
+    previewLoadedIds.current.clear();
+    previewRunRef.current = false;
+    setIsLoadingChats(true);
+    onLoadError(null);
+    setLoadAttempt((attempt) => attempt + 1);
+  }, [onLoadError, setIsLoadingChats]);
 
   return {
+    retry,
     lockPreview: useCallback((chatId: string) => { previewBlockedIds.current.add(chatId); }, []),
   };
 };

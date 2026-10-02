@@ -5,6 +5,7 @@ import { visibleChats, type ChatFilter } from "../../features/search-chats/model
 import { ChatList } from "../../features/search-chats/ui/components/ChatList";
 import { SearchChats } from "../../features/search-chats/ui/components/SearchChats";
 import { AppLogo } from "../../shared/ui/AppLogo";
+import { LuCircleAlert, LuRefreshCw } from "react-icons/lu";
 import { SidebarAccountBar } from "./ui/SidebarAccountBar";
 
 type SidebarProps = {
@@ -19,9 +20,11 @@ type SidebarProps = {
   onNewMessage: () => void;
   onSwitchAccount: (account: UserProfile) => void;
   onAddAccount: () => void;
+  error?: string | null;
+  onRetry?: () => void;
 };
 
-export const Sidebar = ({ chats, profile, accounts, selected, isLoadingChats = false, messageSearchIndex = {}, onSelect, onSignOut, onNewMessage, onSwitchAccount, onAddAccount }: SidebarProps) => {
+export const Sidebar = ({ chats, profile, accounts, selected, isLoadingChats = false, messageSearchIndex = {}, onSelect, onSignOut, onNewMessage, onSwitchAccount, onAddAccount, error = null, onRetry }: SidebarProps) => {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ChatFilter>("all");
   const filteredChats = visibleChats(chats, query, filter, messageSearchIndex);
@@ -34,6 +37,17 @@ export const Sidebar = ({ chats, profile, accounts, selected, isLoadingChats = f
           <button className="rounded-lg border-0 bg-chat-blue px-3 py-2 text-xs font-semibold text-white hover:bg-[#179cde]" onClick={onNewMessage}>New Message</button>
         </div>
         <SearchChats query={query} onQueryChange={setQuery} filter={filter} onFilterChange={setFilter} />
+        {error && (
+          <div role="alert" className="mb-2 flex items-start gap-2 rounded-lg border border-red-900/60 bg-red-950/30 px-2.5 py-2 text-[11px] text-red-200">
+            <LuCircleAlert className="mt-[1px] size-3.5 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 flex-1">{error}</span>
+            {onRetry && (
+              <button className="grid size-6 shrink-0 place-items-center rounded-md hover:bg-red-900/50" aria-label="Retry loading the conversations" title="Retry" onClick={onRetry}>
+                <LuRefreshCw className="size-3.5" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
       <ChatList chats={filteredChats} selected={selected} onSelect={onSelect} loading={isLoadingChats} />
       <SidebarAccountBar

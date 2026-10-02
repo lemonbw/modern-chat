@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { UserProfile } from "../../entities/user/types";
 import { ErrorBoundary } from "../../shared/ui/ErrorBoundary";
+import { PanelState } from "../../shared/ui/PanelState";
 import { NewMessageDialog } from "../../features/contacts/ui/NewMessageDialog";
 import { ChatWindow } from "../../widgets/ChatWindow/ChatWindow";
 import { Sidebar } from "../../widgets/Sidebar/Sidebar";
@@ -17,8 +18,6 @@ type ChatPageProps = {
 export const ChatPage = ({ profile, accounts, onSwitchAccount, onAddAccount, onSignOut }: ChatPageProps) => {
   const isDemo = profile.isDemo ?? (profile.name === "Demo User" && !profile.phone);
   const page = useChatPage(isDemo);
-  // Both are derived from state that changes far less often than the page rerenders: the search
-  // index used to join every text of every chat on each render, which grows with the whole history.
   const activeMessages = useMemo(() => {
     const chat = page.activeChat;
     return chat ? [...chat.messages, ...(page.messages[chat.id] ?? [])] : [];
@@ -43,6 +42,8 @@ export const ChatPage = ({ profile, accounts, onSwitchAccount, onAddAccount, onS
           onNewMessage={() => { if (!isDemo) void page.openContacts(); }}
           onSwitchAccount={onSwitchAccount}
           onAddAccount={onAddAccount}
+          error={page.loadError}
+          onRetry={page.retry}
         />
         {page.activeChat ? (
           <ErrorBoundary key={page.activeChat.id} title="This chat could not be displayed" onReset={() => void page.selectChat(page.activeChat!.id)}>
@@ -70,9 +71,13 @@ export const ChatPage = ({ profile, accounts, onSwitchAccount, onAddAccount, onS
           />
           </ErrorBoundary>
         ) : (
-          <section className="grid min-w-0 flex-1 place-items-center bg-chat-deep px-6 text-center text-sm text-[#a6b3bd] max-[760px]:hidden">
-            {page.loadError ?? (page.isLoadingChats ? "Checking conversations…" : page.activeChat ? "" : "Select a chat")}
-          </section>
+          <PanelState
+            className="max-[760px]:hidden"
+            title="Could not load the conversations"
+            hint="Checking conversations…"
+            error={page.loadError}
+            onRetry={page.retry}
+          />
         )}
       </div>
       <NewMessageDialog
