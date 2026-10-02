@@ -1,0 +1,20 @@
+node_modules
+dist
+dist-server
+dist-ssr
+coverage
+.git
+.gitignore
+.env
+.env.local
+*.local
+Dockerfile
+.dockerignore
+README.md
+Guide.md
+.vscode
+.idea
+.DS_Store
+*.log
+npm-debug.log*
+public/Simple version (White).png

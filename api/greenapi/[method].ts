@@ -29,7 +29,7 @@ const writeError = (response: ServerResponse, status: number, message: string) =
   response.end(JSON.stringify({ error: message }));
 };
 
-const handler = async (request: IncomingMessage, response: ServerResponse, method: string | undefined) => {
+const handler = async (request: IncomingMessage, response: ServerResponse, method: string | undefined, search: string) => {
   if (!safeMethods.has(request.method ?? "")) {
     response.setHeader("Allow", [...safeMethods].join(", "));
     return writeError(response, 405, "Method not allowed");
@@ -47,7 +47,7 @@ const handler = async (request: IncomingMessage, response: ServerResponse, metho
     return writeError(response, 500, "GREEN-API is not configured on the server");
   }
 
-  const target = `${baseUrl}/waInstance${instance}/${method}/${token}`;
+  const target = `${baseUrl}/waInstance${instance}/${method}/${token}${search}`;
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
   const body = hasBody ? await readRawBody(request) : undefined;
 
@@ -78,16 +78,20 @@ const handler = async (request: IncomingMessage, response: ServerResponse, metho
   return undefined;
 };
 
-const readMethodFromPath = (url: string | undefined) => {
-  const match = /\/api\/greenapi\/([^/?#]+)/.exec(url ?? "");
-  const raw = match?.[1];
-  return raw ? decodeURIComponent(raw) : undefined;
+const parseRequestUrl = (url: string | undefined) => {
+  const path = url ?? "";
+  const search = path.includes("?") ? path.slice(path.indexOf("?")) : "";
+  const raw = /\/api\/greenapi\/([^/?#]+)/.exec(path)?.[1];
+  return { method: raw ? decodeURIComponent(raw) : undefined, search };
 };
 
+/** Exported for tests, the serverless entry point only needs the request and the response. */
+export const proxyHandler = handler;
+
 export default async (request: IncomingMessage, response: ServerResponse) => {
-  const method = readMethodFromPath(request.url);
+  const { method, search } = parseRequestUrl(request.url);
   try {
-    await handler(request, response, method);
+    await handler(request, response, method, search);
   } catch (error) {
     if (!response.headersSent) writeError(response, 500, error instanceof Error ? error.message : "Unexpected proxy error");
     else response.end();
