@@ -6,7 +6,7 @@
   }
 
   .avatar {
-    @apply relative grid size-[50px] shrink-0 place-items-center overflow-hidden rounded-full text-[15px] font-semibold text-white;
+    @apply relative size-[50px] text-[15px];
   }
 
   .avatar-small {
