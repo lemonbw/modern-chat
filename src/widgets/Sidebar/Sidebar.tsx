@@ -1,34 +1,42 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { Conversation } from "../../entities/chat/types";
+import type { UserProfile } from "../../entities/user/types";
+import { visibleChats, type ChatFilter } from "../../features/search-chats/model/searchChats";
+import { ChatList } from "../../features/search-chats/ui/components/ChatList";
+import { SearchChats } from "../../features/search-chats/ui/components/SearchChats";
 
-export type Conversation = { id: number; name: string; initials: string; color: string; preview: string; time: string; unread?: number; online?: boolean; group?: boolean; messages: { text: string; time: string; mine?: boolean }[] };
-
-export const conversations: Conversation[] = [
-  { id: 1, name: "Sophie Chen", initials: "SC", color: "linear-gradient(145deg,#efad78,#ce6d67)", preview: "That little café was such a good find ☕", time: "10:42", unread: 2, online: true, messages: [{ text: "Morning! Did you get a chance to look at the photos from yesterday?", time: "10:36" }, { text: "Just saw them — the light in that little café was perfect ✨", time: "10:39", mine: true }, { text: "That little café was such a good find ☕ We should go back this weekend!", time: "10:42" }] },
-  { id: 2, name: "Design team", initials: "DT", color: "linear-gradient(145deg,#76c5bb,#38998e)", preview: "Maya: Updated the moodboard ✨", time: "10:18", unread: 4, group: true, messages: [{ text: "Good morning, everyone! Sharing the first direction for the new landing page.", time: "10:05" }, { text: "Love the softer colors. Could we try one with a little more contrast?", time: "10:11", mine: true }, { text: "Updated the moodboard ✨ take a look when you have a sec", time: "10:18" }] },
-  { id: 3, name: "Alex Morgan", initials: "AM", color: "linear-gradient(145deg,#8f9bd4,#5b68a8)", preview: "Voice message · 0:24", time: "Yesterday", online: true, messages: [{ text: "Are we still on for Saturday? I found a trail by the lake that looks lovely.", time: "Yesterday" }, { text: "Absolutely! Send me the details and I'll bring snacks 🥐", time: "Yesterday", mine: true }] },
-  { id: 4, name: "Weekend plans 🌿", initials: "WP", color: "linear-gradient(145deg,#e3a88d,#d46e70)", preview: "You: Sounds like a plan!", time: "Yesterday", group: true, messages: [{ text: "Picnic in the park if the weather holds?", time: "Yesterday" }, { text: "Sounds like a plan! I'll bring something sweet 🍓", time: "Yesterday", mine: true }] },
-  { id: 5, name: "Mom", initials: "M", color: "linear-gradient(145deg,#d8ad71,#be8058)", preview: "Thank you for calling ❤️", time: "Mon", messages: [{ text: "Thank you for calling ❤️ It was lovely to catch up.", time: "Mon" }] },
-  { id: 6, name: "Noah Williams", initials: "NW", color: "linear-gradient(145deg,#8cb48a,#5c8c72)", preview: "See you at the studio!", time: "Sun", messages: [{ text: "See you at the studio!", time: "Sun" }] },
-];
-
-export function Sidebar({ selected, onSelect, onSignOut }: { selected: number; onSelect: (id: number) => void; onSignOut: () => void }) {
+export const Sidebar = ({ chats, profile, accounts, selected, isLoadingChats = false, messageSearchIndex = {}, onSelect, onSignOut, onNewMessage, onSwitchAccount, onAddAccount, onIndexChatMessages }: { chats: Conversation[]; profile: UserProfile; accounts: UserProfile[]; selected: string | null; isLoadingChats?: boolean; messageSearchIndex?: Record<string, string>; onSelect: (id: string) => void; onSignOut: () => Promise<void>; onNewMessage: () => void; onSwitchAccount: (account: UserProfile) => void; onAddAccount: () => void; onIndexChatMessages: () => void }) => {
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "personal" | "groups">("all");
-  const visibleChats = conversations.filter((chat) => {
-    const matchesSearch = `${chat.name} ${chat.preview}`.toLocaleLowerCase().includes(query.toLocaleLowerCase());
-    const matchesFilter = filter === "all" || (filter === "groups" ? chat.group : !chat.group);
-    return matchesSearch && matchesFilter;
-  });
-  return <aside className="sidebar">
-    <div className="side-head">
-      <div className="brand-row"><div className="brand"><span className="brand-mark">➤</span>Modern Chat</div><button className="icon-button" aria-label="New message" title="New message">✎</button></div>
-      <label className="searchbox"><span>⌕</span><input aria-label="Search conversations" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search conversations" /></label>
+  const [filter, setFilter] = useState<ChatFilter>("all");
+  const [accountMenu, setAccountMenu] = useState(false);
+  const [signOutError, setSignOutError] = useState("");
+  const [signingOut, setSigningOut] = useState(false);
+  const handleSignOut = async () => {
+    setSigningOut(true);
+    setSignOutError("");
+    try {
+      await onSignOut();
+    } catch (error) {
+      setSignOutError(error instanceof Error ? error.message : "Could not log out of Telegram");
+      setAccountMenu(true);
+    } finally {
+      setSigningOut(false);
+    }
+  };
+  const filteredChats = visibleChats(chats, query, filter, messageSearchIndex);
+  useEffect(() => {
+    if (!query.trim()) return;
+    const timer = window.setTimeout(onIndexChatMessages, 350);
+    return () => window.clearTimeout(timer);
+  }, [query, onIndexChatMessages]);
+  return <aside className="flex w-[360px] shrink-0 flex-col border-r border-chat-border bg-chat max-[760px]:w-full max-[760px]:border-0">
+    <div className="px-4 pt-4 pb-2 max-[760px]:px-3 max-[760px]:pt-[11px] max-[760px]:pb-1.5">
+      <div className="mb-[15px] flex items-center justify-between"><div className="flex items-center gap-2.5 text-base font-bold tracking-[-.35px] text-[#e8f0f6]"><span className="grid size-8 place-items-center rounded-full bg-chat-blue text-white shadow-[0_4px_16px_#2aabee33]">➤</span>Modern Chat</div><button className="rounded-lg border-0 bg-chat-blue px-3 py-2 text-xs font-semibold text-white hover:bg-[#179cde]" onClick={onNewMessage}>New Message</button></div>
+      <SearchChats query={query} onQueryChange={setQuery} filter={filter} onFilterChange={setFilter} />
     </div>
-    <div className="filter-row"><button className={`filter-pill ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>All chats</button><button className={`filter-pill ${filter === "personal" ? "active" : ""}`} onClick={() => setFilter("personal")}>Personal</button><button className={`filter-pill ${filter === "groups" ? "active" : ""}`} onClick={() => setFilter("groups")}>Groups</button></div>
-    <div className="chat-list">{visibleChats.map((chat) => <button key={chat.id} className={`chat-row ${selected === chat.id ? "selected" : ""}`} onClick={() => onSelect(chat.id)}>
-      <span className="avatar" style={{ background: chat.color }}>{chat.initials}{chat.online && <i className="online-dot" />}</span>
-      <span className="chat-info"><span className="chat-name-row"><span className="chat-name">{chat.name}</span><span className="chat-time">{chat.time}</span></span><span className="chat-preview-row"><span className="chat-preview">{chat.preview}</span>{chat.unread && <span className="unread">{chat.unread}</span>}</span></span>
-    </button>)}{visibleChats.length === 0 && <div className="empty-search">No conversations found</div>}</div>
-    <div className="side-footer"><span className="avatar small" style={{ background: "linear-gradient(145deg,#93bbc6,#477e91)" }}>JD</span><div className="profile-copy"><strong>Jamie Davis</strong><span>Available</span></div><button className="icon-button" aria-label="Sign out" title="Sign out" onClick={onSignOut}>⋯</button></div>
+    <ChatList chats={filteredChats} selected={selected} onSelect={onSelect} loading={isLoadingChats} />
+    <div className="relative mt-auto flex items-center gap-2.5 border-t border-chat-border bg-chat px-[15px] py-3"><span className="avatar avatar-small overflow-hidden" style={{ background: "linear-gradient(145deg,#93bbc6,#477e91)" }}>{profile.avatar ? <img className="size-full object-cover" src={profile.avatar} alt="" /> : profile.name.slice(0, 1).toUpperCase()}</span><div className="min-w-0 flex-1"><strong className="block truncate text-xs text-[#e1ebf1]">{profile.name}</strong><span className="text-2xs text-[#8fa1ae]">{profile.phone || "Available"}</span></div><button className="icon-button" aria-label="Account options" title="Account options" onClick={() => setAccountMenu((open) => !open)}>⋯</button>
+      {accountMenu && <div className="absolute right-3 bottom-[calc(100%-4px)] z-10 w-56 rounded-lg border border-chat-border bg-[#1c2934] p-1.5 shadow-xl">{accounts.filter((account) => account.phone !== profile.phone).map((account) => <button key={account.phone} className="block w-full rounded-md px-3 py-2 text-left text-xs hover:bg-[#2a3946]" onClick={() => { setAccountMenu(false); onSwitchAccount(account); }}>Switch to {account.name}</button>)}<button className="block w-full rounded-md px-3 py-2 text-left text-xs hover:bg-[#2a3946]" onClick={() => { setAccountMenu(false); onAddAccount(); }}>Add account</button><button className="block w-full rounded-md px-3 py-2 text-left text-xs text-red-300 hover:bg-[#2a3946] disabled:opacity-60" disabled={signingOut} onClick={() => void handleSignOut()}>{signingOut ? "Logging out…" : "Log out"}</button>{signOutError && <p role="alert" className="px-3 py-2 text-xs text-red-300">{signOutError}</p>}</div>}
+    </div>
   </aside>;
-}
+};

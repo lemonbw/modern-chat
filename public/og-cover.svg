@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#17212b"/>
+      <stop offset="1" stop-color="#243746"/>
+    </linearGradient>
+    <linearGradient id="bubble" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#36baf3"/>
+      <stop offset="1" stop-color="#168acd"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" rx="36" fill="url(#background)"/>
+  <circle cx="1040" cy="90" r="220" fill="#36baf3" opacity=".08"/>
+  <circle cx="105" cy="565" r="260" fill="#8f9bd4" opacity=".08"/>
+  <rect x="94" y="156" width="112" height="112" rx="34" fill="url(#bubble)"/>
+  <path d="M127 209 176 177 158 229 145 216 137 225Z" fill="#fff"/>
+  <text x="94" y="354" fill="#f3f7fa" font-family="Inter,Arial,sans-serif" font-size="68" font-weight="700">Modern Chat</text>
+  <text x="98" y="416" fill="#b7c7d2" font-family="Inter,Arial,sans-serif" font-size="30">Telegram messaging, clear and connected.</text>
+</svg>
