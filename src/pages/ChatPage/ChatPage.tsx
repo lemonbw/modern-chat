@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type { UserProfile } from "../../entities/user/types";
 import { ErrorBoundary } from "../../shared/ui/ErrorBoundary";
 import { NewMessageDialog } from "../../features/contacts/ui/NewMessageDialog";
@@ -16,10 +17,16 @@ type ChatPageProps = {
 export const ChatPage = ({ profile, accounts, onSwitchAccount, onAddAccount, onSignOut }: ChatPageProps) => {
   const isDemo = profile.isDemo ?? (profile.name === "Demo User" && !profile.phone);
   const page = useChatPage(isDemo);
-  const activeMessages = page.activeChat
-    ? [...page.activeChat.messages, ...(page.messages[page.activeChat.id] ?? [])]
-    : [];
-  const messageSearchIndex = Object.fromEntries(Object.entries(page.messages).map(([chatId, messages]) => [chatId, messages.map((message) => message.text).join(" ")]));
+  // Both are derived from state that changes far less often than the page rerenders: the search
+  // index used to join every text of every chat on each render, which grows with the whole history.
+  const activeMessages = useMemo(() => {
+    const chat = page.activeChat;
+    return chat ? [...chat.messages, ...(page.messages[chat.id] ?? [])] : [];
+  }, [page.activeChat, page.messages]);
+  const messageSearchIndex = useMemo(
+    () => Object.fromEntries(Object.entries(page.messages).map(([chatId, messages]) => [chatId, messages.map((message) => message.text).join(" ")])),
+    [page.messages],
+  );
 
   return (
     <main className="app-backdrop min-h-dvh w-full bg-chat">
