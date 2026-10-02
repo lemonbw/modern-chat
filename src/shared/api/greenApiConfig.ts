@@ -19,6 +19,8 @@ const methods: Record<string, string> = {
   forwardMessages: "forwardMessages",
   deleteMessage: "deleteMessage",
   addContact: "addContact",
+  deleteContact: "deleteContact",
+  readChat: "readChat",
   createGroup: "createGroup",
   uploadFile: "uploadFile",
   sendFileByUpload: "sendFileByUpload",

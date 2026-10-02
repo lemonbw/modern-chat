@@ -3,10 +3,7 @@ import { getContactAvatar, getContactInfo } from "../../api/greenApiContacts";
 
 const avatarStorageKey = "modern-chat-avatar-cache";
 
-/**
- * A picture is cached forever, a contact without one for a week. GREEN-API gives roughly a hundred
- * avatar calls per month, so re-asking for a known answer would burn the quota for the whole account.
- */
+/** Pictures are cached forever and a contact without one for a week: the quota is about a hundred calls a month. */
 const missingAvatarTtlMs = 7 * 24 * 60 * 60 * 1000;
 
 type CacheEntry = { source: string | null; at?: number };
@@ -33,7 +30,7 @@ const writeCache = (chatId: string, source: string | null) => {
   try {
     localStorage.setItem(avatarStorageKey, JSON.stringify(Object.fromEntries(avatarCache.entries())));
   } catch {
-    // Storage may be full; the in-memory copy still serves this session.
+    return new Map();
   }
 };
 
@@ -83,7 +80,6 @@ export const ContactAvatar = ({
     };
 
     const loadAvatar = async () => {
-      // The contact card already carries the picture, so it is the cheaper of the two calls.
       const contactInfo = await getContactInfo(chatId).catch(() => null);
       const fromContact = toAvatarSource(contactInfo?.avatar, contactInfo?.base64Avatar);
       if (fromContact) {
@@ -91,11 +87,9 @@ export const ContactAvatar = ({
         return;
       }
       if (contactInfo) {
-        // The card answered and had no picture, so the second call would waste the quota.
         applySource(null);
         return;
       }
-      // Groups are not served by the contact endpoint and still need the avatar call.
       const result = await getContactAvatar(chatId).catch(() => null);
       const fromAvatar = toAvatarSource(result?.urlAvatar ?? undefined, result?.base64Avatar ?? undefined);
       applySource(fromAvatar);
@@ -122,7 +116,7 @@ export const ContactAvatar = ({
 
   const currentAvatar = externalAvatar || avatar;
   return (
-    <span ref={avatarRef} className={`${className} overflow-hidden`} style={{ background: color }}>
+    <span ref={avatarRef} className={`grid shrink-0 place-items-center overflow-hidden rounded-full font-semibold text-white ${className}`} style={{ background: color }}>
       {currentAvatar ? (
         <img
           className="size-full object-cover"

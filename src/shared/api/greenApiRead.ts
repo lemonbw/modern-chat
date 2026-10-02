@@ -10,7 +10,6 @@ const nextAllowedAt = new Map<string, number>();
 const wait = (durationMs: number) => new Promise<void>((resolve) => window.setTimeout(resolve, durationMs));
 const intervalForMethod = (method: string) => method === "getMessage" ? 150 : minimumIntervalMs;
 
-/** Mirrors the shape of an axios error so callers can keep handling 466 as before. */
 const pausedError = (method: string) => Object.assign(new Error(`${method} is paused until the GREEN-API quota resets`), { response: { status: quotaErrorStatus } });
 
 const retryDelay = (error: unknown, attempt: number) => {
@@ -48,14 +47,12 @@ const runWithMethodLimit = async <T>(method: string, request: () => Promise<T>):
   try {
     const run = async () => {
       for (let attempt = 0; ; attempt += 1) {
-        // A method whose monthly quota is gone is not called again until the pause expires.
         if (isMethodPaused(method)) throw pausedError(method);
         await reserveRateLimitSlot(method);
         try {
           return await request();
         } catch (error) {
-          // 466 means the monthly quota of the method is gone: pausing it is the only answer,
-          // retrying would only spend the calls that are left.
+          // 466 is an exhausted monthly quota, not a rate limit: pause instead of retrying.
           if (!axios.isAxiosError(error)) throw error;
           if (error.response?.status === quotaErrorStatus) {
             pauseMethod(method);

@@ -3,7 +3,16 @@ import { greenApiUrl } from "../../../shared/api/greenApiConfig";
 import { greenApiRead } from "../../../shared/api/greenApiRead";
 
 export type GreenApiContact = { id: string; chatId?: string; name?: string; contactName?: string; type?: string; phoneNumber?: string | number; username?: string; avatar?: string; base64Avatar?: string };
-export type GreenApiContactInfo = { name?: string; contactName?: string; lastSeen?: string | number | null; avatar?: string; base64Avatar?: string; phoneNumber?: string | number; username?: string; chatType?: string };
+export type GreenApiContactInfo = {
+  name?: string;
+  contactName?: string;
+  lastSeen?: string | number | null;
+  avatar?: string;
+  base64Avatar?: string;
+  phoneNumber?: string | number;
+  username?: string;
+  chatType?: string;
+};
 export type GreenApiAvatar = { urlAvatar?: string | null; base64Avatar?: string | null; available?: boolean };
 export type GreenApiGroupData = {
   chatId?: string;
@@ -18,11 +27,7 @@ export type GreenApiGroupData = {
   participants?: { id?: string; chatId?: string; name?: string; role?: string }[];
 };
 
-/**
- * GREEN-API allows about a hundred calls per method per month, so a contact card may be fetched a
- * handful of times and not on every render. The cache keeps both successful and empty answers for
- * a while, and remembers the methods whose monthly quota is gone.
- */
+/** About a hundred calls per method per month: results and empty answers are cached for hours. */
 const contactCacheStorageKey = "modern-chat-contact-cache";
 const contactCacheTtlMs = 6 * 60 * 60 * 1000;
 
@@ -42,7 +47,6 @@ const readCache = (): Map<string, CacheEntry> => {
 
 const contactCache = readCache();
 
-/** A paused method still answers with null so one exhausted quota never breaks the screen. */
 const isQuotaError = (error: unknown) => {
   const status = typeof error === "object" && error !== null && "response" in error
     ? (error as { response?: { status?: number } }).response?.status
@@ -56,7 +60,7 @@ const persistCache = (chatId: string, info: GreenApiContactInfo | null) => {
   try {
     localStorage.setItem(contactCacheStorageKey, JSON.stringify(Object.fromEntries(contactCache.entries())));
   } catch {
-    // Storage may be full; the in-memory copy still avoids repeat calls this session.
+    return new Map();
   }
 };
 
@@ -90,7 +94,6 @@ export const getContactInfo = async (chatId: string): Promise<GreenApiContactInf
   const cached = cachedContactInfo(chatId);
   if (cached !== undefined) return cached;
 
-  // The error must reach greenApiRead so it can pause the method, hence the catch outside.
   try {
     return await greenApiRead("getContactInfo", chatId, async () => {
       const { data } = await greenApiClient.post<GreenApiContactInfo | null>(greenApiUrl("getContactInfo"), { chatId });
@@ -130,6 +133,10 @@ export const addContact = async (name: string, chatId: string) => {
 export const createGroup = async (name: string, chatIds: string[]) => {
   const { data } = await greenApiClient.post<{ chatId?: string; groupId?: string }>(greenApiUrl("createGroup"), { groupName: name, chatIds });
   return data;
+};
+
+export const deleteContact = async (chatId: string) => {
+  await greenApiClient.post(greenApiUrl("deleteContact"), { chatId });
 };
 
 export const archiveChat = async (chatId: string) => {

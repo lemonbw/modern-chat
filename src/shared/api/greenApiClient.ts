@@ -2,12 +2,10 @@ import axios from "axios";
 
 declare module "axios" {
   interface AxiosRequestConfig {
-    /** Keeps the unauthorized handler out of this request so it can report the error itself. */
     reportUnauthorized?: boolean;
   }
 }
 
-/** Fired when GREEN-API answers 401 so the session layer can drop back to the login page. */
 export const unauthorizedEvent = "modern-chat:unauthorized";
 
 const defaultReportUnauthorized = true;

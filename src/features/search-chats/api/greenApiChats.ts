@@ -48,6 +48,8 @@ const toConversation = (chat: GreenApiChat, index: number): Conversation | null 
     preview: preview || ((chat.unreadCount ?? 0) > 0 ? "New message" : ""),
     time: timestamp ? new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" }).format(new Date(timestamp * 1000)) : "",
     group: chat.type ? ["group", "supergroup", "channel"].includes(chat.type) : id.startsWith("-"),
+    phoneNumber: chat.phoneNumber,
+    username: chat.username,
     archived: chat.archive ?? false,
     unread: chat.unreadCount ?? 0,
     hasConversation: true,
