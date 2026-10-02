@@ -14,14 +14,49 @@ type Env = {
 const methodNamePattern = /^[A-Za-z][A-Za-z0-9]{0,63}$/;
 const safeMethods = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]);
 const hopByHopHeaders = new Set(["connection", "keep-alive", "transfer-encoding", "upgrade", "host", "content-length"]);
+/** Headers that would either widen access to the response or hand out upstream state. */
+const strippedHeaders = new Set(["set-cookie", "set-cookie2", "access-control-allow-origin", "access-control-allow-credentials", "access-control-allow-methods", "access-control-allow-headers", "access-control-expose-headers"]);
+const maxBodyBytes = 1024 * 1024;
+const maxResponseBytes = 8 * 1024 * 1024;
 
 const readRawBody = (request: IncomingMessage) =>
   new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
-    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    let size = 0;
+    request.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > maxBodyBytes) {
+        reject(Object.assign(new Error("Request body is too large"), { statusCode: 413 }));
+        request.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
     request.on("end", () => resolve(Buffer.concat(chunks)));
     request.on("error", reject);
   });
+
+const readLimited = async (upstream: Response) => {
+  const declared = Number(upstream.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declared) && declared > maxResponseBytes) {
+    throw Object.assign(new Error("Upstream response is too large"), { statusCode: 502 });
+  }
+  const buffer = Buffer.from(await upstream.arrayBuffer());
+  if (buffer.length > maxResponseBytes) {
+    throw Object.assign(new Error("Upstream response is too large"), { statusCode: 502 });
+  }
+  return buffer;
+};
+
+const isSameOrigin = (request: IncomingMessage) => {
+  const origin = request.headers.origin;
+  if (!origin) return true;
+  try {
+    return new URL(origin).host === request.headers.host;
+  } catch {
+    return false;
+  }
+};
 
 const writeError = (response: ServerResponse, status: number, message: string) => {
   response.statusCode = status;
@@ -37,6 +72,10 @@ const handler = async (request: IncomingMessage, response: ServerResponse, metho
 
   if (!method || !methodNamePattern.test(method)) {
     return writeError(response, 400, "Unknown GREEN-API method");
+  }
+
+  if (!isSameOrigin(request)) {
+    return writeError(response, 403, "Cross origin requests are not allowed");
   }
 
   const env = process.env as Env;
@@ -68,12 +107,13 @@ const handler = async (request: IncomingMessage, response: ServerResponse, metho
 
   response.statusCode = upstream.status;
   upstream.headers.forEach((value, key) => {
-    if (!hopByHopHeaders.has(key.toLowerCase()) && !key.toLowerCase().startsWith("content-security-policy")) {
+    const name = key.toLowerCase();
+    if (!hopByHopHeaders.has(name) && !strippedHeaders.has(name) && !name.startsWith("content-security-policy")) {
       response.setHeader(key, value);
     }
   });
 
-  const payload = Buffer.from(await upstream.arrayBuffer());
+  const payload = await readLimited(upstream);
   response.end(payload);
   return undefined;
 };
@@ -93,8 +133,10 @@ export default async (request: IncomingMessage, response: ServerResponse) => {
   try {
     await handler(request, response, method, search);
   } catch (error) {
-    if (!response.headersSent) writeError(response, 500, error instanceof Error ? error.message : "Unexpected proxy error");
-    else response.end();
+    if (!response.headersSent) {
+      const status = typeof error === "object" && error !== null && "statusCode" in error ? Number((error as { statusCode: unknown }).statusCode) : 500;
+      writeError(response, status === 413 || status === 502 ? status : 500, error instanceof Error ? error.message : "Unexpected proxy error");
+    } else response.end();
   }
 };
 

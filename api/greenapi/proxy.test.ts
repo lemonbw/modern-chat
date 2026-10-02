@@ -5,11 +5,11 @@ import { proxyHandler } from "./[method].ts";
 
 type StubRequest = IncomingMessage & PassThrough & { method: string; url: string };
 
-const createRequest = (url: string, method = "GET", body = ""): StubRequest => {
+const createRequest = (url: string, method = "GET", body = "", headers: Record<string, string> = {}): StubRequest => {
   const stream = new PassThrough() as unknown as StubRequest;
   stream.method = method;
   stream.url = url;
-  stream.headers = { accept: "application/json" } as unknown as IncomingMessage["headers"];
+  stream.headers = { accept: "application/json", host: "localhost:5173", ...headers } as unknown as IncomingMessage["headers"];
   if (body) {
     stream.headers["content-type"] = "application/json";
     process.nextTick(() => {
@@ -38,7 +38,7 @@ const createResponse = () => {
     },
     body: () => Buffer.concat(chunks).toString(),
   };
-  return response as unknown as StubResponse & { body: () => string };
+  return response as unknown as StubResponse & { body: () => string; setHeader: ReturnType<typeof vi.fn> };
 };
 
 const upstreamMock = vi.fn();
@@ -102,6 +102,38 @@ describe("green api proxy", () => {
     await proxyHandler(createRequest("/api/greenapi/getChats"), response as ServerResponse, "getChats", "");
     expect(response.statusCode).toBe(500);
     expect(response.body()).not.toContain("secret-token");
+    expect(upstreamMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a cross origin browser call", async () => {
+    const response = createResponse();
+    await proxyHandler(createRequest("/api/greenapi/getChats", "GET", "", { origin: "https://evil.example" }), response as ServerResponse, "getChats", "");
+    expect(response.statusCode).toBe(403);
+    expect(upstreamMock).not.toHaveBeenCalled();
+  });
+
+  it("allows a browser call from this origin", async () => {
+    const response = createResponse();
+    await proxyHandler(createRequest("/api/greenapi/getChats", "GET", "", { origin: "http://localhost:5173" }), response as ServerResponse, "getChats", "");
+    expect(response.statusCode).toBe(200);
+  });
+
+  it("does not forward the cors headers of the upstream", async () => {
+    upstreamMock.mockResolvedValue(new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Set-Cookie": "session=1" },
+    }));
+    const response = createResponse();
+    await proxyHandler(createRequest("/api/greenapi/getChats"), response as ServerResponse, "getChats", "");
+    const forwarded = response.setHeader.mock.calls.map((call: unknown[]) => String(call[0]).toLowerCase());
+    expect(forwarded).not.toContain("access-control-allow-origin");
+    expect(forwarded).not.toContain("set-cookie");
+  });
+
+  it("rejects a body larger than one megabyte", async () => {
+    const response = createResponse();
+    await expect(proxyHandler(createRequest("/api/greenapi/sendMessage", "POST", "x".repeat(1024 * 1024 + 64)), response as ServerResponse, "sendMessage", ""))
+      .rejects.toThrow();
     expect(upstreamMock).not.toHaveBeenCalled();
   });
 
