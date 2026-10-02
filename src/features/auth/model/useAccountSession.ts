@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { UserProfile } from "../../../entities/user/types";
+import { unauthorizedEvent } from "../../../shared/api/greenApiClient";
 import { logoutGreenApiInstance } from "../api/greenApiAuth";
 
 const PROFILE_KEY = "modern-chat-profile";
 const ACCOUNTS_KEY = "modern-chat-accounts";
 const ADD_ACCOUNT_RETURN_KEY = "modern-chat-add-account-return";
+
+const isDemoProfile = (profile: UserProfile | null) => profile?.isDemo ?? (profile?.name === "Demo User" && !profile.phone);
 
 const readProfile = (): UserProfile | null => {
   try {
@@ -35,11 +38,32 @@ export const useAccountSession = () => {
     }
   });
 
+  const profileRef = useRef(profile);
+
+  const leaveSession = () => {
+    localStorage.removeItem(PROFILE_KEY);
+    profileRef.current = null;
+    setProfile(null);
+    if (!window.location.pathname.startsWith("/login")) window.history.pushState({}, "", "/login");
+  };
+
+  // A 401 means GREEN-API rejected the instance credentials, so the only way forward is a new authorization.
+  useEffect(() => {
+    const onUnauthorized = () => {
+      const current = profileRef.current;
+      if (!current || isDemoProfile(current)) return;
+      leaveSession();
+    };
+    window.addEventListener(unauthorizedEvent, onUnauthorized);
+    return () => window.removeEventListener(unauthorizedEvent, onUnauthorized);
+  }, []);
+
   const signIn = (next: UserProfile) => {
     const nextAccounts = [next, ...accounts.filter((account) => account.phone !== next.phone)];
     localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(nextAccounts));
     localStorage.setItem(PROFILE_KEY, JSON.stringify(next));
     setAccounts(nextAccounts);
+    profileRef.current = next;
     setProfile(next);
     sessionStorage.removeItem(ADD_ACCOUNT_RETURN_KEY);
     setAddAccountReturn(null);
@@ -47,23 +71,22 @@ export const useAccountSession = () => {
   };
 
   const signOut = async () => {
-    const isDemo = profile?.isDemo ?? (profile?.name === "Demo User" && !profile.phone);
+    const isDemo = isDemoProfile(profile);
     if (profile && !isDemo) {
       const loggedOut = await logoutGreenApiInstance();
       if (!loggedOut) throw new Error("GREEN-API did not confirm logout. The Telegram instance may still be connected.");
     }
-    const isCurrentAccount = (account: UserProfile) => (account.isDemo ?? (account.name === "Demo User" && !account.phone)) === isDemo
+    const isCurrentAccount = (account: UserProfile) => isDemoProfile(account) === isDemo
       && (profile?.phone ? account.phone === profile.phone : account.name === profile?.name);
     const nextAccounts = accounts.filter((account) => !isCurrentAccount(account));
     localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(nextAccounts));
-    localStorage.removeItem(PROFILE_KEY);
+    leaveSession();
     setAccounts(nextAccounts);
-    setProfile(null);
-    window.history.pushState({}, "", "/login");
   };
 
   const switchAccount = (account: UserProfile) => {
     localStorage.setItem(PROFILE_KEY, JSON.stringify(account));
+    profileRef.current = account;
     setProfile(account);
   };
 
@@ -72,15 +95,14 @@ export const useAccountSession = () => {
       sessionStorage.setItem(ADD_ACCOUNT_RETURN_KEY, JSON.stringify(profile));
       setAddAccountReturn(profile);
     }
-    localStorage.removeItem(PROFILE_KEY);
-    setProfile(null);
-    window.history.pushState({}, "", "/login");
+    leaveSession();
   };
 
   const cancelAddAccount = () => {
     if (!addAccountReturn) return;
     localStorage.setItem(PROFILE_KEY, JSON.stringify(addAccountReturn));
     sessionStorage.removeItem(ADD_ACCOUNT_RETURN_KEY);
+    profileRef.current = addAccountReturn;
     setProfile(addAccountReturn);
     setAddAccountReturn(null);
     window.history.pushState({}, "", "/chat");

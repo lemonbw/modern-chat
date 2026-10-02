@@ -1,7 +1,7 @@
 import type { Conversation } from "../../../entities/chat/types";
 import { greenApiUrl } from "../../../shared/api/greenApiConfig";
 import { greenApiRead } from "../../../shared/api/greenApiRead";
-import axios from "axios";
+import { greenApiClient } from "../../../shared/api/greenApiClient";
 import { getContacts } from "../../contacts/api/greenApiContacts";
 
 type GreenApiChat = {
@@ -73,7 +73,7 @@ export const searchChats = async (query = ""): Promise<Conversation[]> => {
 
 const loadChats = async (): Promise<unknown[]> => {
   return greenApiRead("getChats", "all", async () => {
-    const { data } = await axios.get<unknown[]>(greenApiUrl("getChats"));
+    const { data } = await greenApiClient.get<unknown[]>(greenApiUrl("getChats"));
     if (!Array.isArray(data)) throw new Error("Green API returned an invalid chats list");
     return data;
   });

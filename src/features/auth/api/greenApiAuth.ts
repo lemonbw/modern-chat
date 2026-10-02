@@ -1,4 +1,5 @@
 import axios from "axios";
+import { greenApiClient } from "../../../shared/api/greenApiClient";
 import { greenApiUrl } from "../../../shared/api/greenApiConfig";
 import { greenApiRead } from "../../../shared/api/greenApiRead";
 import type { UserProfile } from "../../../entities/user/types";
@@ -23,25 +24,25 @@ type QrResponse = { type?: string; message?: string };
 
 export const getQr = async () => {
   return greenApiRead("qr", "current", async () => {
-    const { data } = await axios.get<QrResponse>(greenApiUrl("qr"), { params: { _ts: Date.now() } });
+    const { data } = await greenApiClient.get<QrResponse>(greenApiUrl("qr"), { params: { _ts: Date.now() } });
     return data;
   });
 };
 
 export const getAuthorizationState = async () => {
   return greenApiRead("getStateInstance", "current", async () => {
-    const { data } = await axios.get<StateResponse>(greenApiUrl("getStateInstance"));
+    const { data } = await greenApiClient.get<StateResponse>(greenApiUrl("getStateInstance"));
     return data?.stateInstance;
   });
 };
 
 export const logoutGreenApiInstance = async () => {
-  const { data } = await axios.get<{ isLogout?: boolean }>(greenApiUrl("logout"));
+  const { data } = await greenApiClient.get<{ isLogout?: boolean }>(greenApiUrl("logout"));
   return data?.isLogout === true;
 };
 
 export const getUserProfile = async (): Promise<UserProfile> => {
-  const { data } = await axios.get<TelegramSettings>(greenApiUrl("getAccountSettings"));
+  const { data } = await greenApiClient.get<TelegramSettings>(greenApiUrl("getAccountSettings"));
   const phone = data.phone ?? "";
   const name = data.name?.trim() || (data.username ? `@${data.username.replace(/^@/, "")}` : "Telegram user");
   const avatar = data.avatar || (data.base64Avatar ? `data:image/jpeg;base64,${data.base64Avatar}` : null);
@@ -72,5 +73,5 @@ export const waitForAuthorization = async (signal: AbortSignal, requireFreshAuth
 };
 
 export const sendAuthorizationPassword = async (password: string) => {
-  return axios.post(greenApiUrl("sendAuthorizationPassword"), { password });
+  return greenApiClient.post(greenApiUrl("sendAuthorizationPassword"), { password });
 };

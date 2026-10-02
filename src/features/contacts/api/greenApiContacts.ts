@@ -1,4 +1,4 @@
-import axios from "axios";
+import { greenApiClient } from "../../../shared/api/greenApiClient";
 import { greenApiUrl } from "../../../shared/api/greenApiConfig";
 import { greenApiRead } from "../../../shared/api/greenApiRead";
 
@@ -7,13 +7,13 @@ export type GreenApiContactInfo = { name?: string; contactName?: string; lastSee
 export type GreenApiAvatar = { urlAvatar?: string | null; base64Avatar?: string | null; available?: boolean };
 
 export const checkTelegramAccount = async (value: { phoneNumber: number } | { username: string }) => {
-  const { data } = await axios.post<{ exist?: boolean; chatId?: string; username?: string; phoneNumber?: number }>(greenApiUrl("checkAccount"), value);
+  const { data } = await greenApiClient.post<{ exist?: boolean; chatId?: string; username?: string; phoneNumber?: number }>(greenApiUrl("checkAccount"), value);
   return data;
 };
 
 export const getContacts = async (): Promise<GreenApiContact[]> => {
   return greenApiRead("getContacts", "all", async () => {
-    const { data } = await axios.get<Array<GreenApiContact & { chatId?: string }>>(greenApiUrl("getContacts"));
+    const { data } = await greenApiClient.get<Array<GreenApiContact & { chatId?: string }>>(greenApiUrl("getContacts"));
     if (!Array.isArray(data)) throw new Error("Green API returned an invalid contacts list");
     return data.flatMap((contact) => {
       const id = contact.chatId ?? contact.id;
@@ -24,32 +24,32 @@ export const getContacts = async (): Promise<GreenApiContact[]> => {
 
 export const getContactInfo = async (chatId: string): Promise<GreenApiContactInfo | null> => {
   return greenApiRead("getContactInfo", chatId, async () => {
-    const { data } = await axios.post<GreenApiContactInfo | null>(greenApiUrl("getContactInfo"), { chatId });
+    const { data } = await greenApiClient.post<GreenApiContactInfo | null>(greenApiUrl("getContactInfo"), { chatId });
     return data;
   });
 };
 
 export const getContactAvatar = async (chatId: string): Promise<GreenApiAvatar | null> => {
   return greenApiRead("getAvatar", chatId, async () => {
-    const { data } = await axios.post<GreenApiAvatar | null>(greenApiUrl("getAvatar"), { chatId });
+    const { data } = await greenApiClient.post<GreenApiAvatar | null>(greenApiUrl("getAvatar"), { chatId });
     return data;
   });
 };
 
 export const addContact = async (name: string, chatId: string) => {
-  await axios.post(greenApiUrl("addContact"), { chatId, firstName: name });
+  await greenApiClient.post(greenApiUrl("addContact"), { chatId, firstName: name });
   return { id: chatId, chatId, name, type: "user" } satisfies GreenApiContact;
 };
 
 export const createGroup = async (name: string, chatIds: string[]) => {
-  const { data } = await axios.post<{ chatId?: string; groupId?: string }>(greenApiUrl("createGroup"), { groupName: name, chatIds });
+  const { data } = await greenApiClient.post<{ chatId?: string; groupId?: string }>(greenApiUrl("createGroup"), { groupName: name, chatIds });
   return data;
 };
 
 export const archiveChat = async (chatId: string) => {
-  await axios.post(greenApiUrl("archiveChat"), { chatId });
+  await greenApiClient.post(greenApiUrl("archiveChat"), { chatId });
 };
 
 export const unarchiveChat = async (chatId: string) => {
-  await axios.post(greenApiUrl("unarchiveChat"), { chatId });
+  await greenApiClient.post(greenApiUrl("unarchiveChat"), { chatId });
 };
