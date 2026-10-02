@@ -1,4 +1,5 @@
 import type { UserProfile } from "../../entities/user/types";
+import { ErrorBoundary } from "../../shared/ui/ErrorBoundary";
 import { NewMessageDialog } from "../../features/contacts/ui/NewMessageDialog";
 import { ChatWindow } from "../../widgets/ChatWindow/ChatWindow";
 import { Sidebar } from "../../widgets/Sidebar/Sidebar";
@@ -37,6 +38,7 @@ export const ChatPage = ({ profile, accounts, onSwitchAccount, onAddAccount, onS
           onAddAccount={onAddAccount}
         />
         {page.activeChat ? (
+          <ErrorBoundary key={page.activeChat.id} title="This chat could not be displayed" onReset={() => void page.selectChat(page.activeChat!.id)}>
           <ChatWindow
             key={page.activeChat.id}
             chat={page.activeChat}
@@ -45,18 +47,21 @@ export const ChatPage = ({ profile, accounts, onSwitchAccount, onAddAccount, onS
             isLoadingMessages={page.isLoadingMessages}
             hasMoreMessages={page.hasMoreMessages}
             isLoadingOlderMessages={page.isLoadingOlderMessages}
-            onLoadOlderMessages={() => void page.loadOlderMessages()}
+            onLoadOlderMessages={page.loadOlderMessages}
             archived={page.activeChat.archived ?? false}
             error={page.loadError}
             onSend={(text, quotedMessage) => void page.send(text, quotedMessage)}
             onSendFiles={(files, quotedMessage, caption) => void page.sendFiles(files, quotedMessage, caption)}
-            onBack={() => page.setMobileOpen(false)}
+            onBack={page.closeMobileChat}
             onToggleArchive={() => void page.toggleArchive()}
+            notificationsOff={page.activeChat?.notificationsOff ?? false}
+            onToggleNotifications={page.toggleNotifications}
             onDeleteMessage={(message, onlySenderDelete) => page.deleteMessage(message, onlySenderDelete)}
             showDeletedMessages={page.showDeletedMessages}
             onToggleDeletedMessages={page.toggleDeletedMessages}
             onForwardMessage={page.forwardMessage}
           />
+          </ErrorBoundary>
         ) : (
           <section className="grid min-w-0 flex-1 place-items-center bg-chat-deep px-6 text-center text-sm text-[#a6b3bd] max-[760px]:hidden">
             {page.loadError ?? (page.isLoadingChats ? "Checking conversations…" : page.activeChat ? "" : "Select a chat")}

@@ -3,11 +3,13 @@ import type { FormEvent } from "react";
 import type { ChatMessage, Conversation } from "../../../entities/chat/types";
 import { archiveChat, getContactInfo, unarchiveChat } from "../../../features/contacts/api/greenApiContacts";
 import { useContactManager } from "../../../features/contacts/model/useContactManager";
-import { getChatMessages } from "../../../features/messages/api/greenApiMessages";
+import { getChatMessages, markChatAsRead } from "../../../features/messages/api/greenApiMessages";
 import { searchChats } from "../../../features/search-chats/api/greenApiChats";
+import { setChatMuted, withMuteState } from "../../../features/search-chats/model/mutedChats";
 import { loadChatPreviews, previewTimeLabel } from "../../../features/search-chats/model/chatPreviews";
 import { useChatCommands } from "./useChatCommands";
 import { useChatHistory } from "./useChatHistory";
+import { useChatUiStore } from "./chatUiStore";
 import {
   errorMessage,
   initialHistorySize,
@@ -29,12 +31,16 @@ const getInitialChatId = (isDemo: boolean) => {
 
 export const useChatPage = (isDemo = false) => {
   const [chats, setChats] = useState<Conversation[]>([]);
-  const [selected, setSelected] = useState<string | null>(() => getInitialChatId(isDemo));
+  const [selected, setSelected] = useState<string | null>(() => getInitialChatId(isDemo) ?? useChatUiStore.getState().selectedChatId);
   const initialSelectedChatId = useRef(selected);
   const [isLoadingChats, setIsLoadingChats] = useState(!isDemo);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [showDeletedMessages, setShowDeletedMessages] = useState(() => localStorage.getItem("modern-chat-show-deleted") === "true");
+  const mobileOpen = useChatUiStore((state) => state.mobileOpen);
+  const closeMobileChat = useChatUiStore((state) => state.closeMobileChat);
+  const showDeletedMessages = useChatUiStore((state) => state.showDeletedMessages);
+  const toggleDeletedMessages = useChatUiStore((state) => state.toggleDeletedMessages);
+
+  useEffect(() => useChatUiStore.getState().selectChat(selected), [selected]);
   const previewLoadedIds = useRef(new Set<string>());
   const previewBlockedIds = useRef(new Set<string>());
   const contactManager = useContactManager(!isDemo);
@@ -66,30 +72,50 @@ export const useChatPage = (isDemo = false) => {
     messagesOf: (chatId) => history.messages[chatId] ?? [],
   });
 
+  const { isLoadingMessages } = history;
+
   const selectedRef = useRef(selected);
   useEffect(() => { selectedRef.current = selected; }, [selected]);
 
-  // Sidebar previews: newest message and unread run for every chat that was never opened.
+  // The preview pass patches the chat list, so it must survive the effect re-runs those patches cause.
+  const isAliveRef = useRef(true);
+  const previewRunRef = useRef(false);
+  // StrictMode mounts, unmounts and mounts again, so the flag is set on every mount.
   useEffect(() => {
-    if (isDemo || isLoadingChats || chats.length === 0) return;
-    const pending = chats.filter((chat) => !previewLoadedIds.current.has(chat.id));
+    isAliveRef.current = true;
+    return () => { isAliveRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (isDemo || isLoadingChats || isLoadingMessages || chats.length === 0 || previewRunRef.current) return;
+    // The chat on screen loads its own history, so it joins the queue once it is left.
+    const openId = selectedRef.current;
+    const pending = chats.filter((chat) => !previewLoadedIds.current.has(chat.id) && chat.id !== openId);
     if (pending.length === 0) return;
     pending.forEach((chat) => previewLoadedIds.current.add(chat.id));
-    let isMounted = true;
+    previewRunRef.current = true;
 
-    void loadChatPreviews(pending, new Set(selectedRef.current ? [selectedRef.current] : []), (patch) => {
-      if (!isMounted) return;
+    // Runs once the current chat is loaded: one history call per other chat fills every sidebar row.
+    void loadChatPreviews(pending, new Set(), (patch) => {
+      if (!isAliveRef.current) return;
       if (previewBlockedIds.current.has(patch.id)) return;
       patchChat(patch.id, {
         ...(patch.preview !== undefined ? { preview: patch.preview } : {}),
         ...(patch.timestamp !== undefined ? { time: previewTimeLabel(patch.timestamp), lastTimestamp: patch.timestamp } : {}),
         ...(patch.sender !== undefined ? { sender: patch.sender } : {}),
       });
-      if (patch.unread !== undefined) patchChat(patch.id, { unread: patch.unread });
-    }, () => !isMounted);
+      if (patch.unread !== undefined) patchChat(patch.id, { unread: patch.unread, unreadTruncated: patch.unreadTruncated ?? false });
+    }, () => !isAliveRef.current).finally(() => { previewRunRef.current = false; });
+  }, [chats, isDemo, isLoadingChats, isLoadingMessages, patchChat, selected]);
 
-    return () => { isMounted = false; };
-  }, [chats, isDemo, isLoadingChats, patchChat]);
+  // Opening a chat clears its counter here and marks the chat read on the server side.
+  const readChatRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (isDemo || !selected || readChatRef.current === selected || !history.isLoaded(selected)) return;
+    readChatRef.current = selected;
+    patchChat(selected, { unread: 0, unreadTruncated: false });
+    void markChatAsRead(selected).catch(() => undefined);
+  }, [history, isDemo, patchChat, selected]);
 
   // Initial load: the active chat opens first, the chat list arrives while its media renders.
   useEffect(() => {
@@ -102,10 +128,35 @@ export const useChatPage = (isDemo = false) => {
       let chatId = initialSelectedChatId.current;
       let latestLoadedMessage: ChatMessage | undefined;
 
+      const commitChats = (list: Conversation[]) => {
+        if (!isMounted) return;
+        // The open chat shows its newest message as the row preview once the history is in.
+        setChats(withMuteState(chatId && latestLoadedMessage
+          ? list.map((chat) => chat.id === chatId
+            ? {
+                ...chat,
+                preview: latestLoadedMessage!.text,
+                time: latestLoadedMessage!.time,
+                lastTimestamp: latestLoadedMessage!.timestamp,
+                sender: chat.group ? latestLoadedMessage!.sender : undefined,
+              }
+            : chat)
+          : list));
+        setIsLoadingChats(false);
+      };
+
+      // The list does not depend on the history, so it is fetched and shown in parallel: the shell
+      // and the cached messages of this chat are on screen even when the history request is slow.
+      const startChatList = () => {
+        if (chatListPromise) return chatListPromise;
+        chatListPromise = searchChats();
+        void chatListPromise.then((list) => { resultChats = list; commitChats(list); }).catch(() => undefined);
+        return chatListPromise;
+      };
+
       try {
         if (!chatId) {
-          chatListPromise = searchChats();
-          resultChats = await chatListPromise;
+          resultChats = await startChatList();
           if (!isMounted) return;
           chatId = resultChats[0]?.id ?? null;
           if (chatId) {
@@ -113,6 +164,8 @@ export const useChatPage = (isDemo = false) => {
             window.history.replaceState({}, "", `/chat/${encodeURIComponent(chatId)}`);
             rememberSelectedChat(chatId);
           }
+        } else {
+          startChatList();
         }
 
         if (chatId) {
@@ -121,40 +174,20 @@ export const useChatPage = (isDemo = false) => {
           rememberSelectedChat(chatId);
           const result = await getChatMessages(chatId, initialHistorySize);
           if (!isMounted) return;
-          await history.publishInStages(chatId, result, () => {
-            if (!chatListPromise) {
-              chatListPromise = searchChats();
-              void chatListPromise.catch(() => undefined);
-            }
-          });
+          await history.publishInStages(chatId, result);
           history.setIsLoadingMessages(false);
           history.updateHistoryPage(chatId, { count: initialHistorySize, hasMore: result.length >= initialHistorySize, loadingOlder: false });
           latestLoadedMessage = result.find((message) => !message.deleted);
         }
 
-        if (!resultChats) resultChats = await (chatListPromise ?? searchChats());
-        if (!isMounted) return;
-
-        if (chatId && latestLoadedMessage) {
-          resultChats = resultChats.map((chat) => chat.id === chatId
-            ? {
-                ...chat,
-                preview: latestLoadedMessage!.text,
-                time: latestLoadedMessage!.time,
-                lastTimestamp: latestLoadedMessage!.timestamp,
-                sender: chat.group ? latestLoadedMessage!.sender : undefined,
-              }
-            : chat);
-        }
-
-        setChats(resultChats);
+        if (resultChats) commitChats(resultChats);
       } catch (error) {
         if (!isMounted) return;
         setLoadError(errorMessage(error, "Could not load chats"));
         if (!resultChats) {
-          try { resultChats = await searchChats(); } catch { resultChats = []; }
+          try { resultChats = await startChatList(); } catch { resultChats = []; }
         }
-        setChats(resultChats ?? []);
+        commitChats(resultChats ?? []);
       } finally {
         if (isMounted) {
           setIsLoadingChats(false);
@@ -189,7 +222,6 @@ export const useChatPage = (isDemo = false) => {
       if (name) patchChat(selected, { name, initials: initialsOf(name) });
       if (info.lastSeen) patchChat(selected, { lastSeen: info.lastSeen });
     }).catch(() => {
-      // Best effort, the chat stays usable without the contact card.
     });
     return () => { isMounted = false; };
   }, [isDemo, isLoadingChats, patchChat, selected]);
@@ -199,7 +231,7 @@ export const useChatPage = (isDemo = false) => {
   const selectChat = async (id: string, preferredName?: string) => {
     if (isDemo) return;
     setSelected(id);
-    setMobileOpen(true);
+    useChatUiStore.getState().openMobileChat(id);
     setLoadError(null);
     window.history.pushState({}, "", `/chat/${encodeURIComponent(id)}`);
     rememberSelectedChat(id);
@@ -234,13 +266,10 @@ export const useChatPage = (isDemo = false) => {
     }
   };
 
-  const toggleDeletedMessages = () => {
-    setShowDeletedMessages((current) => {
-      const next = !current;
-      localStorage.setItem("modern-chat-show-deleted", String(next));
-      return next;
-    });
-  };
+  const toggleNotifications = useCallback(() => {
+    if (isDemo || !activeChat) return;
+    patchChat(activeChat.id, { notificationsOff: setChatMuted(activeChat.id, !activeChat.notificationsOff) });
+  }, [activeChat, isDemo, patchChat]);
 
   const saveContact = (event: FormEvent<HTMLFormElement>) => contactManager.saveContact(event, selectChat);
   const saveGroup = (event: FormEvent<HTMLFormElement>) => contactManager.saveGroup(event, selectChat);
@@ -251,7 +280,7 @@ export const useChatPage = (isDemo = false) => {
     hasMoreMessages: selected ? history.historyPages[selected]?.hasMore ?? false : false,
     isLoadingOlderMessages: selected ? history.historyPages[selected]?.loadingOlder ?? false : false,
     ...contactManager,
-    setMobileOpen,
+    closeMobileChat,
     selectChat,
     send: commands.send,
     sendFiles: commands.sendFiles,
@@ -260,6 +289,7 @@ export const useChatPage = (isDemo = false) => {
     saveContact,
     saveGroup,
     toggleArchive,
+    toggleNotifications,
     loadOlderMessages: history.loadOlderMessages,
     showDeletedMessages,
     toggleDeletedMessages,
