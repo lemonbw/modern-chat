@@ -16,6 +16,7 @@ const safeMethods = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 const hopByHopHeaders = new Set(["connection", "keep-alive", "transfer-encoding", "upgrade", "host", "content-length"]);
 /** Headers that would either widen access to the response or hand out upstream state. */
 const strippedHeaders = new Set(["set-cookie", "set-cookie2", "access-control-allow-origin", "access-control-allow-credentials", "access-control-allow-methods", "access-control-allow-headers", "access-control-expose-headers"]);
+/** The browser only sends small JSON. */
 const maxBodyBytes = 1024 * 1024;
 const maxResponseBytes = 8 * 1024 * 1024;
 
@@ -48,6 +49,7 @@ const readLimited = async (upstream: Response) => {
   return buffer;
 };
 
+/** A browser request has to come from this origin; other clients send no Origin at all. */
 const isSameOrigin = (request: IncomingMessage) => {
   const origin = request.headers.origin;
   if (!origin) return true;

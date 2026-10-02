@@ -117,6 +117,7 @@ const isPublicAddress = async (hostname: string) => {
   }
 };
 
+/** Redirects are followed by hand, checking every hop against the private ranges. */
 const fetchDocument = async (start: URL, signal: AbortSignal) => {
   let target = start;
   for (let hop = 0; hop <= maxRedirects; hop += 1) {

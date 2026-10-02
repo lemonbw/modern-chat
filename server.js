@@ -34,6 +34,8 @@ const sendFile = (response, filePath, statusCode = 200) => {
   createReadStream(filePath).pipe(response);
 };
 
+// `blob:` covers recorded voice messages.
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   "img-src 'self' data: blob: https: http:",
