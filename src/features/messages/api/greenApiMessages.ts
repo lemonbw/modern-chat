@@ -17,6 +17,12 @@ type GreenApiMessage = {
   fileName?: string;
   mimeType?: string;
   jpegThumbnail?: string;
+  stickerMessageData?: {
+    downloadUrl?: string;
+    fileName?: string;
+    jpegThumbnail?: string;
+    mimeType?: string;
+  };
 };
 
 const statusFromApi = (status?: string): ChatMessage["status"] => {
@@ -60,15 +66,18 @@ const thumbnailDataUrl = (thumbnail?: string) => {
 };
 
 const messageMedia = (item: GreenApiMessage): ChatMessageMedia | undefined => {
-  if (!item.downloadUrl) return undefined;
+  const stickerData = item.stickerMessageData;
+  const downloadUrl = item.downloadUrl ?? stickerData?.downloadUrl;
+  if (!downloadUrl) return undefined;
   let url: URL;
   try {
-    url = new URL(item.downloadUrl);
+    url = new URL(downloadUrl);
   } catch {
     return undefined;
   }
   if (url.protocol !== "https:") return undefined;
-  const kind = item.typeMessage === "imageMessage" ? "image"
+  const kind = item.typeMessage === "stickerMessage" ? "sticker"
+    : item.typeMessage === "imageMessage" ? "image"
     : item.typeMessage === "videoMessage" ? "video"
       : item.typeMessage === "audioMessage" ? "audio"
         : undefined;
@@ -76,10 +85,10 @@ const messageMedia = (item: GreenApiMessage): ChatMessageMedia | undefined => {
   return {
     kind,
     url: url.toString(),
-    mimeType: item.mimeType,
-    fileName: item.fileName,
+    mimeType: item.mimeType ?? stickerData?.mimeType,
+    fileName: item.fileName ?? stickerData?.fileName,
     caption: item.caption,
-    thumbnail: thumbnailDataUrl(item.jpegThumbnail),
+    thumbnail: thumbnailDataUrl(item.jpegThumbnail ?? stickerData?.jpegThumbnail),
   };
 };
 

@@ -30,7 +30,6 @@ export const ChatPage = ({ profile, accounts, onSwitchAccount, onAddAccount, onS
           selected={page.selected}
           isLoadingChats={page.isLoadingChats}
           messageSearchIndex={messageSearchIndex}
-          onIndexChatMessages={page.indexChatMessages}
           onSelect={(id) => void page.selectChat(id)}
           onSignOut={onSignOut}
           onNewMessage={() => { if (!isDemo) void page.openContacts(); }}
@@ -42,6 +41,10 @@ export const ChatPage = ({ profile, accounts, onSwitchAccount, onAddAccount, onS
             chat={page.activeChat}
             forwardingTargets={page.chats}
             messages={activeMessages}
+            isLoadingMessages={page.isLoadingMessages}
+            hasMoreMessages={page.hasMoreMessages}
+            isLoadingOlderMessages={page.isLoadingOlderMessages}
+            onLoadOlderMessages={() => void page.loadOlderMessages()}
             archived={page.activeChat.archived ?? false}
             error={page.loadError}
             onSend={(text, quotedMessage) => void page.send(text, quotedMessage)}

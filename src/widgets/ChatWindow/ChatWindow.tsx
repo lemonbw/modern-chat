@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import type { ChatMessage, Conversation } from "../../entities/chat/types";
 import { ContactAvatar } from "../../features/contacts/ui/components/ContactAvatar";
@@ -20,6 +20,10 @@ const lastSeenLabel = (value?: string | number | null) => {
 export const ChatWindow = ({
   chat,
   messages,
+  isLoadingMessages,
+  hasMoreMessages,
+  isLoadingOlderMessages,
+  onLoadOlderMessages,
   onSend,
   onBack,
   onToggleArchive,
@@ -33,6 +37,10 @@ export const ChatWindow = ({
 }: {
   chat: Conversation;
   messages: ChatMessage[];
+  isLoadingMessages: boolean;
+  hasMoreMessages: boolean;
+  isLoadingOlderMessages: boolean;
+  onLoadOlderMessages: () => void;
   onSend: (text: string, quotedMessage?: ChatMessage) => void;
   onBack: () => void;
   onToggleArchive: () => void;
@@ -56,11 +64,30 @@ export const ChatWindow = ({
   const [deleting, setDeleting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
+  const scrollToBottom = useRef(true);
+  const olderScrollAnchor = useRef<{ scrollHeight: number; scrollTop: number } | null>(null);
+  const renderedChatId = useRef(chat.id);
+
+  useLayoutEffect(() => {
+    const messageList = messagesRef.current;
+    if (!messageList) return;
+    if (renderedChatId.current !== chat.id) {
+      renderedChatId.current = chat.id;
+      scrollToBottom.current = true;
+      olderScrollAnchor.current = null;
+    }
+    if (olderScrollAnchor.current) {
+      const anchor = olderScrollAnchor.current;
+      messageList.scrollTop = anchor.scrollTop + (messageList.scrollHeight - anchor.scrollHeight);
+      olderScrollAnchor.current = null;
+      return;
+    }
+    if (scrollToBottom.current) messageList.scrollTop = messageList.scrollHeight;
+  }, [chat.id, messages.length, isLoadingMessages]);
 
   useEffect(() => {
-    const messageList = messagesRef.current;
-    if (messageList) messageList.scrollTop = messageList.scrollHeight;
-  }, [chat.id, messages.length]);
+    if (!isLoadingOlderMessages && olderScrollAnchor.current) olderScrollAnchor.current = null;
+  }, [isLoadingOlderMessages]);
 
   const openMessageMenu = (event: ReactMouseEvent<HTMLDivElement>, message: ChatMessage) => {
     if (!message.id || message.deleted) return;
@@ -111,6 +138,12 @@ export const ChatWindow = ({
       setForwarding(false);
     }
   };
+  const loadOlderAtTop = (scrollHeight: number, scrollTop: number) => {
+    if (!hasMoreMessages || isLoadingOlderMessages || olderScrollAnchor.current) return;
+    olderScrollAnchor.current = { scrollHeight, scrollTop };
+    scrollToBottom.current = false;
+    onLoadOlderMessages();
+  };
   const visibleMessages = messages.filter((message) => showDeletedMessages || !message.deleted);
   return (
     <section className="flex min-w-0 flex-1 flex-col bg-chat-deep max-[760px]:hidden" onClick={() => { if (contextMenu) setContextMenu(null); }}>
@@ -130,15 +163,26 @@ export const ChatWindow = ({
         <div className="relative"><button className="icon-button" aria-label="More options" onClick={() => setMenuOpen((open) => !open)}>⋯</button>{menuOpen && <div className="absolute top-11 right-0 z-10 w-56 rounded-lg border border-chat-border bg-[#1c2934] p-1.5 shadow-xl"><button className="block w-full rounded-md px-3 py-2 text-left text-xs hover:bg-[#2a3946]" onClick={() => { onToggleArchive(); setMenuOpen(false); }}>{archived ? "Unarchive chat" : "Archive chat"}</button><button className="block w-full rounded-md px-3 py-2 text-left text-xs hover:bg-[#2a3946]" onClick={() => { onToggleDeletedMessages(); setMenuOpen(false); }}>{showDeletedMessages ? "Hide deleted messages" : "Show deleted messages"}</button></div>}</div>
       </header>
       {error && <p role="alert" className="border-b border-red-900/60 bg-red-950/40 px-5 py-2 text-xs text-red-200">{error}</p>}
-      <div ref={messagesRef} className="message-wallpaper flex flex-1 flex-col gap-[9px] overflow-auto pl-[7px] pr-[clamp(20px,6vw,90px)] py-6 max-[760px]:px-3 max-[760px]:py-[17px]">
+      <div ref={messagesRef} onScroll={(event) => {
+        const list = event.currentTarget;
+        scrollToBottom.current = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
+        if (list.scrollTop <= 32) loadOlderAtTop(list.scrollHeight, list.scrollTop);
+      }} onWheel={(event) => {
+        const list = event.currentTarget;
+        if (event.deltaY < 0 && list.scrollTop <= 32) loadOlderAtTop(list.scrollHeight, list.scrollTop);
+      }} className="message-wallpaper flex flex-1 flex-col gap-[9px] overflow-auto pl-[7px] pr-[clamp(20px,6vw,90px)] py-6 max-[760px]:px-3 max-[760px]:py-[17px]">
+        {hasMoreMessages && <button type="button" className="sticky top-0 z-[1] min-h-5 self-center rounded-full bg-[#182532d9] px-2 py-1 text-[10px] text-[#9aabb7] hover:text-white disabled:opacity-70" disabled={isLoadingOlderMessages} onClick={() => {
+          const list = messagesRef.current;
+          if (list) loadOlderAtTop(list.scrollHeight, list.scrollTop);
+        }}>{isLoadingOlderMessages ? "Loading older messages…" : "Load earlier messages"}</button>}
         <div className="my-[1px] mb-[9px] self-center rounded-[14px] bg-[#182532d9] px-[11px] py-[5px] text-caption text-[#d3dde4] shadow-[0_1px_4px_#0003]">
           Today
         </div>
-        {messages.length === 0 && <p className="self-start px-1 text-xs text-[#9aabb7]">No messages yet</p>}
+        {messages.length === 0 && <p className="self-start px-1 text-xs text-[#9aabb7]">{isLoadingMessages ? "Loading messages…" : "No messages yet"}</p>}
         {messages.length > 0 && visibleMessages.length === 0 && <p className="self-start px-1 text-xs text-[#9aabb7]">Deleted messages are hidden</p>}
         {visibleMessages.map((message, index) => (
           <div
-            key={`${index}-${message.time}`}
+            key={message.id ?? `${message.time}-${index}-${message.text}`}
             onContextMenu={(event) => openMessageMenu(event, message)}
             className={`max-w-[min(72%,560px)] self-start break-words [overflow-wrap:anywhere] whitespace-pre-wrap rounded-[10px_10px_10px_2px] bg-[#182533] px-[11px] pt-2 pb-1.5 text-control leading-[1.48] text-[#e5edf3] shadow-[0_1px_2px_#0003] max-[760px]:max-w-[87%] ${message.mine ? "self-end rounded-[10px_10px_2px_10px] bg-[#2b5278]" : ""}`}
           >
