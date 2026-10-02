@@ -1,19 +1,19 @@
-import { useState } from "react";
-import type { ChatMessageMedia } from "../../../entities/chat/types";
+import { memo, useState } from "react";
+import type { MediaDescriptor } from "../model/mediaCache";
 
-const MessageMedia = ({ media, alt }: { media: ChatMessageMedia; alt: string }) => {
+const MessageMedia = memo(({ descriptor, alt }: { descriptor: MediaDescriptor; alt: string }) => {
+  const { media, previewSource, downloadFileName } = descriptor;
   const [expanded, setExpanded] = useState(false);
 
   if (media.kind === "sticker") {
-    const stickerSource = media.thumbnail ?? (media.mimeType === "application/x-tgsticker" ? undefined : media.url);
+    const stickerSource = previewSource;
     return stickerSource
       ? <img src={stickerSource} alt={alt} loading="lazy" decoding="async" fetchPriority="low" className="mb-1 max-h-40 max-w-40 object-contain" />
       : <span className="mb-1 block text-xs text-[#c0ccd4]">Sticker</span>;
   }
 
   if (media.kind === "image") {
-    const previewSrc = media.url || media.thumbnail;
-    const downloadFileName = media.fileName ?? media.url.split("/").pop()?.split("?")[0] ?? "image.jpg";
+    const previewSrc = previewSource;
     return <>
       <button
         type="button"
@@ -107,6 +107,6 @@ const MessageMedia = ({ media, alt }: { media: ChatMessageMedia; alt: string }) 
   >
     <source src={media.url} type={media.mimeType} />
   </audio>;
-};
+});
 
 export { MessageMedia };
