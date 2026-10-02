@@ -28,14 +28,36 @@ const ogPreview = await import("./dist-server/og.mjs");
 
 const sendFile = (response, filePath, statusCode = 200) => {
   response.statusCode = statusCode;
+  response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("Content-Type", contentTypes[extname(filePath)] ?? "application/octet-stream");
   response.setHeader("Cache-Control", filePath.includes(`${sep}assets${sep}`) ? "public, max-age=31536000, immutable" : "no-cache");
   createReadStream(filePath).pipe(response);
 };
 
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "img-src 'self' data: blob: https: http:",
+  "media-src 'self' blob: https: http:",
+  "connect-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "script-src 'self'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+].join("; ");
+
+const securityHeaders = (response) => {
+  response.setHeader("Content-Security-Policy", contentSecurityPolicy);
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("Referrer-Policy", "no-referrer");
+};
+
 /** Serves the built SPA and forwards the API calls to the same proxy GREEN-API uses. */
 const server = createServer(async (request, response) => {
   const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
+  securityHeaders(response);
 
   if (url.pathname === "/api/health") {
     response.setHeader("Content-Type", "application/json");
