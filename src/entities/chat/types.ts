@@ -31,6 +31,7 @@ export type Conversation = {
   preview: string;
   time: string;
   unread?: number;
+  lastTimestamp?: number;
   online?: boolean;
   lastSeen?: string | number | null;
   avatar?: string | null;
