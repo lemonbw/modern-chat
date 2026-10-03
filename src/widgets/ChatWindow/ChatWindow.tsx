@@ -21,8 +21,8 @@ export type ChatWindowProps = {
   onSendFiles: (files: OutgoingFile[], quotedMessage?: ChatMessage, caption?: string) => void;
   onBack: () => void;
   onToggleArchive: () => void;
-  onToggleNotifications: () => void;
-  notificationsOff: boolean;
+  // onToggleNotifications: () => void; // TODO: Re-enable when Green API supports per-chat notification state
+  _notificationsOff: boolean;
   onDeleteMessage: (message: ChatMessage, onlySenderDelete: boolean) => Promise<void>;
   onToggleDeletedMessages: () => void;
   onForwardMessage: (message: ChatMessage, destinationChatId: string) => Promise<void>;
@@ -33,7 +33,7 @@ export type ChatWindowProps = {
 };
 
 export const ChatWindow = (props: ChatWindowProps) => {
-  const { chat, messages, isLoadingMessages, hasMoreMessages, isLoadingOlderMessages, onLoadOlderMessages, onSend, onSendFiles, onBack, onToggleArchive, onToggleNotifications, notificationsOff, onDeleteMessage, onToggleDeletedMessages, onForwardMessage, forwardingTargets, showDeletedMessages, archived, error } = props;
+  const { chat, messages, isLoadingMessages, hasMoreMessages, isLoadingOlderMessages, onLoadOlderMessages, onSend, onSendFiles, onBack, onToggleArchive, /* _onToggleNotifications, */ _notificationsOff, onDeleteMessage, onToggleDeletedMessages, onForwardMessage, forwardingTargets, showDeletedMessages, archived, error } = props;
   const [menuOpen, setMenuOpen] = useState(false);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [focusSignal, setFocusSignal] = useState(0);
@@ -71,8 +71,8 @@ export const ChatWindow = (props: ChatWindowProps) => {
           onBack={onBack}
           onOpenInfo={() => setIsInfoOpen(true)}
           onToggleArchive={onToggleArchive}
-          notificationsOff={notificationsOff}
-          onToggleNotifications={onToggleNotifications}
+          _notificationsOff={_notificationsOff}
+          // onToggleNotifications={onToggleNotifications} // TODO: Re-enable when Green API supports per-chat notification state
           onToggleDeletedMessages={onToggleDeletedMessages}
           search={search}
           onJumpToMessage={(index) => { wall.scrollToIndex(index); search.close(); setFocusSignal((value) => value + 1); }}

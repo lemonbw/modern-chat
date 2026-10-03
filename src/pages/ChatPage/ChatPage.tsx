@@ -62,8 +62,8 @@ export const ChatPage = ({ profile, accounts, onSwitchAccount, onAddAccount, onS
             onSendFiles={(files, quotedMessage, caption) => void page.sendFiles(files, quotedMessage, caption)}
             onBack={page.closeMobileChat}
             onToggleArchive={() => void page.toggleArchive()}
-            notificationsOff={page.activeChat?.notificationsOff ?? false}
-            onToggleNotifications={page.toggleNotifications}
+            _notificationsOff={page.activeChat?.notificationsOff ?? false}
+            // onToggleNotifications={page.toggleNotifications} // TODO: Re-enable when Green API supports per-chat notification state
             onDeleteMessage={(message, onlySenderDelete) => page.deleteMessage(message, onlySenderDelete)}
             showDeletedMessages={page.showDeletedMessages}
             onToggleDeletedMessages={page.toggleDeletedMessages}
