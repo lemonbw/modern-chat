@@ -1,6 +1,7 @@
 import { LuArrowLeft, LuSearch, LuX } from "react-icons/lu";
 import { ContactAvatar } from "../../../features/contacts/ui/components/ContactAvatar";
 import { lastSeenLabel } from "../../../shared/lib/lastSeen";
+import { initialsOf } from "../../../pages/ChatPage/model/chatPageState";
 import { contentGutter, contentInset, pageColumn } from "../lib/layout";
 import { ChatHeaderMenu } from "./ChatHeaderMenu";
 import { ChatSearchField, type ChatSearchModel } from "./ChatSearchField";
@@ -15,6 +16,8 @@ type Props = {
     group?: boolean;
     online?: boolean;
     lastSeen?: string | number | null;
+    firstName?: string;
+    lastName?: string;
   };
   archived: boolean;
   showDeletedMessages: boolean;
@@ -26,8 +29,8 @@ type Props = {
   onJumpToMessage: (index: number) => void;
   menuOpen: boolean;
   setMenuOpen: (value: boolean) => void;
-  notificationsOff: boolean;
-  onToggleNotifications: () => void;
+  _notificationsOff: boolean;
+  // onToggleNotifications: () => void; // TODO: Re-enable when Green API supports per-chat notification state
 };
 
 /**
@@ -46,8 +49,8 @@ export const ChatHeader = ({
   onJumpToMessage,
   menuOpen,
   setMenuOpen,
-  notificationsOff,
-  onToggleNotifications,
+  _notificationsOff,
+  // onToggleNotifications, // TODO: Re-enable when Green API supports per-chat notification state
 }: Props) => {
   const closeMenu = () => setMenuOpen(false);
   return (
@@ -64,13 +67,17 @@ export const ChatHeader = ({
               title={`${chat.group ? "Group" : "User"} info`}
               onClick={onOpenInfo}
             >
-              <ContactAvatar key={chat.id} chatId={chat.id} name={chat.name} initials={chat.initials} color={chat.color} avatar={chat.avatar} className="avatar avatar-small" />
+              <ContactAvatar key={chat.id} chatId={chat.id} name={chat.firstName || chat.lastName ? [chat.firstName, chat.lastName].filter(Boolean).join(" ").trim() : chat.name} initials={chat.firstName || chat.lastName ? initialsOf([chat.firstName, chat.lastName].filter(Boolean).join(" ").trim()) : chat.initials} color={chat.color} avatar={chat.avatar} className="avatar avatar-small" />
             </button>
             {search.isOpen
               ? <ChatSearchField search={search} onJumpToMessage={onJumpToMessage} />
               : (
                 <div className="min-w-0 flex-1">
-                  <strong className="block truncate text-sm text-[#f1f5f7]">{chat.name}</strong>
+                  <strong className="block truncate text-sm text-[#f1f5f7]">
+                    {chat.firstName || chat.lastName
+                      ? [chat.firstName, chat.lastName].filter(Boolean).join(" ").trim()
+                      : chat.name}
+                  </strong>
                   {!chat.group && (
                     <span className="text-caption text-[#8fa1ae]">
                       {chat.online ? "●  Online now" : lastSeenLabel(chat.lastSeen)}
@@ -93,7 +100,7 @@ export const ChatHeader = ({
             <ChatHeaderMenu
               isOpen={menuOpen}
               archived={archived}
-              notificationsOff={notificationsOff}
+              _notificationsOff={_notificationsOff}
               showDeletedMessages={showDeletedMessages}
               onOpen={() => {
                 search.close();
@@ -101,10 +108,6 @@ export const ChatHeader = ({
               }}
               onToggleArchive={() => {
                 onToggleArchive();
-                closeMenu();
-              }}
-              onToggleNotifications={() => {
-                onToggleNotifications();
                 closeMenu();
               }}
               onToggleDeletedMessages={() => {

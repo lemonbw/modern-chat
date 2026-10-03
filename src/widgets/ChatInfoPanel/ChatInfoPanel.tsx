@@ -44,9 +44,9 @@ export const ChatInfoPanel = ({ chat, messages, onClose }: { chat: Conversation;
                 username={usernameOf(isGroup ? model.group?.username : model.username)}
                 link={linkOf(model.group?.groupInviteLink)}
                 about={aboutOf(model.group?.description)}
-                notificationsOn={model.stored?.notifications !== false}
-                detailsFromChatList={model.detailsFromChatList}
-                onToggleNotifications={model.setNotifications}
+                // _notificationsOn={!isChatMuted(chat.id)}
+                // _detailsFromChatList={model.detailsFromChatList}
+                // _onToggleNotifications={model.setNotifications}
               />
             )}
             <InfoTabs tabs={model.tabs} activeTab={model.activeTab} onSelect={model.selectTab} />

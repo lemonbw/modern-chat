@@ -3,7 +3,8 @@ import type { ChatMessage, Conversation } from "../../../entities/chat/types";
 import { useContactDetails } from "./useContactDetails";
 import type { GreenApiContactInfo, GreenApiGroupData } from "../../../features/contacts/api/greenApiContacts";
 import { buildMembers, buildTabItems, groupTabs, userTabs, type InfoTab } from "../../../features/contacts/model/chatInfo";
-import { emptyProfile, readLocalProfile, writeLocalProfile, type LocalProfile } from "../../../features/contacts/model/localProfile";
+import { readLocalProfile, writeLocalProfile, type LocalProfile } from "../../../features/contacts/model/localProfile";
+import { setChatMuted } from "../../../features/search-chats/model/mutedChats";
 
 export const firstPageSize = 9;
 const pageStep = 12;
@@ -126,6 +127,6 @@ export const useInfoPanel = (chat: Conversation, messages: ChatMessage[]): InfoP
     setShowVideos,
     loadMore: () => setVisibleCount((count) => Math.min(count + pageStep, items.length)),
     persist,
-    setNotifications: (value) => persist({ ...emptyProfile(), ...(stored ?? {}), notifications: value }),
+    setNotifications: (value) => setChatMuted(chatIdRef.current, value),
   };
 };

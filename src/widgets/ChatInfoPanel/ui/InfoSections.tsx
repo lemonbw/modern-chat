@@ -2,7 +2,7 @@ import { LuPlay } from "react-icons/lu";
 import type { Conversation } from "../../../entities/chat/types";
 import { ContactAvatar } from "../../../features/contacts/ui/components/ContactAvatar";
 import type { InfoItem } from "../../../features/contacts/model/chatInfo";
-import { InfoRow, Toggle } from "./InfoPrimitives";
+import { InfoRow } from "./InfoPrimitives";
 import { lastSeenTextOf } from "../model/infoValues";
 
 export const ProfileSummary = ({ chat, displayName, lastSeenText, avatar, isExpanded, onToggleAvatar }: {
@@ -28,30 +28,30 @@ export const ProfileSummary = ({ chat, displayName, lastSeenText, avatar, isExpa
   </section>
 );
 
-export const ProfileDetails = ({ isGroup, phone, username, link, about, notificationsOn, detailsFromChatList, onToggleNotifications }: {
+export const ProfileDetails = ({ isGroup, phone, username, link, about, /* _notificationsOn, */ _detailsFromChatList, /* _onToggleNotifications */ }: {
   isGroup: boolean;
   phone: string;
   username: string;
   link?: string;
   about?: string;
-  notificationsOn: boolean;
-  detailsFromChatList?: boolean;
-  onToggleNotifications: (value: boolean) => void;
+  /* _notificationsOn: boolean; */
+  _detailsFromChatList?: boolean;
+  /* _onToggleNotifications: (value: boolean) => void; */
 }) => (
   <section className="flex flex-col gap-3 px-4 pb-4 text-sm">
     <InfoRow label="Phone" value={phone} />
     <InfoRow label="Username" value={username} />
     {isGroup && <InfoRow label="Link" value={link} />}
     {isGroup && <InfoRow label="About" value={about} />}
-    {detailsFromChatList && (
+    {_detailsFromChatList && (
       <p className="-mt-1 rounded-[8px] bg-[#1b2734] px-2.5 py-1.5 text-2xs leading-4 text-[#8fa1ae]">
         Name, phone and username come from the chat list: getContactInfo was not called, its monthly quota is spent.
       </p>
     )}
-    <div className="flex items-center justify-between gap-3">
+    {/* <div className="flex items-center justify-between gap-3">
       <span className="text-[#8fa1ae]">Notifications</span>
-      <Toggle checked={notificationsOn} onChange={onToggleNotifications} label="Toggle notifications" />
-    </div>
+      <Toggle checked={_notificationsOn} onChange={_onToggleNotifications} label="Toggle notifications" />
+    </div> */}
   </section>
 );
 

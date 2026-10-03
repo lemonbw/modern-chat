@@ -47,5 +47,8 @@ export type Conversation = {
   notificationsOff?: boolean;
   group?: boolean;
   archived?: boolean;
+  /** Locally edited first/last name (stored in IndexedDB). */
+  firstName?: string;
+  lastName?: string;
   messages: ChatMessage[];
 };

@@ -4,7 +4,8 @@ import { getChatMessages, markChatAsRead } from "../../../features/messages/api/
 import { searchChats } from "../../../features/search-chats/api/greenApiChats";
 import { withMuteState } from "../../../features/search-chats/model/mutedChats";
 import { loadChatPreviews, previewTimeLabel } from "../../../features/search-chats/model/chatPreviews";
-import { errorMessage, initialHistorySize, rememberSelectedChat, type HistoryPage } from "./chatPageState";
+import { readLocalProfile } from "../../../features/contacts/model/localProfile";
+import { errorMessage, initialHistorySize, rememberSelectedChat, initialsOf, type HistoryPage } from "./chatPageState";
 
 /** The slice of the history hook the chat list needs. */
 export type ChatListHistory = {
@@ -91,18 +92,41 @@ export const useChatList = ({ isDemo, history, chats, setChats, isLoadingChats, 
       const commitChats = (list: Conversation[]) => {
         if (!isMounted) return;
         // The open chat shows its newest message as the row preview once the history is in.
-        setChats(withMuteState(chatId && latestLoadedMessage
-          ? list.map((chat) => chat.id === chatId
-            ? {
-                ...chat,
-                preview: latestLoadedMessage!.text,
-                time: latestLoadedMessage!.time,
-                lastTimestamp: latestLoadedMessage!.timestamp,
-                sender: chat.group ? latestLoadedMessage!.sender : undefined,
-              }
-            : chat)
-          : list));
-        setIsLoadingChats(false);
+        // Also apply locally edited names from IndexedDB
+        void Promise.all(list.map(async (chat) => {
+          const profile = await readLocalProfile(chat.id);
+          return { chat, profile };
+        })).then((results) => {
+          if (!isMounted) return;
+          setChats(withMuteState(chatId && latestLoadedMessage
+            ? results.map(({ chat, profile }) => chat.id === chatId
+              ? {
+                  ...chat,
+                  ...(profile?.firstName || profile?.lastName ? { 
+                    firstName: profile.firstName, 
+                    lastName: profile.lastName,
+                    name: [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() || chat.name,
+                    initials: initialsOf([profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() || chat.name),
+                  } : {}),
+                  preview: latestLoadedMessage!.text,
+                  time: latestLoadedMessage!.time,
+                  lastTimestamp: latestLoadedMessage!.timestamp,
+                  sender: chat.group ? latestLoadedMessage!.sender : undefined,
+                }
+              : { ...chat, ...(profile?.firstName || profile?.lastName ? { 
+                  firstName: profile.firstName, 
+                  lastName: profile.lastName,
+                  name: [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() || chat.name,
+                  initials: initialsOf([profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() || chat.name),
+                } : {}) })
+            : results.map(({ chat, profile }) => ({ ...chat, ...(profile?.firstName || profile?.lastName ? { 
+                firstName: profile.firstName, 
+                lastName: profile.lastName,
+                name: [profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() || chat.name,
+                initials: initialsOf([profile.firstName, profile.lastName].filter(Boolean).join(" ").trim() || chat.name),
+              } : {}) }))));
+          setIsLoadingChats(false);
+        });
       };
 
       const startChatList = () => {

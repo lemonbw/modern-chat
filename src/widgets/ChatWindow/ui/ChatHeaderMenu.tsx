@@ -4,16 +4,16 @@ import { LuEllipsisVertical } from "react-icons/lu";
 type Props = {
   isOpen: boolean;
   archived: boolean;
-  notificationsOff: boolean;
+  _notificationsOff: boolean;
   showDeletedMessages: boolean;
   onOpen: () => void;
   onToggleArchive: () => void;
-  onToggleNotifications: () => void;
+  // onToggleNotifications: () => void; // TODO: Re-enable when Green API supports per-chat notification state
   onToggleDeletedMessages: () => void;
 };
 
 /** The overflow menu of the header: archive, notifications and deleted messages. */
-export const ChatHeaderMenu = memo(({ isOpen, archived, notificationsOff, showDeletedMessages, onOpen, onToggleArchive, onToggleNotifications, onToggleDeletedMessages }: Props) => (
+export const ChatHeaderMenu = memo(({ isOpen, archived, /* _notificationsOff, */ showDeletedMessages, onOpen, onToggleArchive, onToggleDeletedMessages }: Props) => (
   <div className="relative">
     <button className="icon-button" aria-label="More options" onClick={onOpen}>
       <LuEllipsisVertical className="size-[18px]" />
@@ -26,12 +26,12 @@ export const ChatHeaderMenu = memo(({ isOpen, archived, notificationsOff, showDe
         >
           {archived ? "Unarchive chat" : "Archive chat"}
         </button>
-        <button
+        {/* <button
           className="block w-full rounded-md px-3 py-2 text-left text-xs hover:bg-[#2a3946]"
           onClick={onToggleNotifications}
         >
           {notificationsOff ? "Turn notifications on" : "Turn notifications off"}
-        </button>
+        </button> */}
         <button
           className="block w-full rounded-md px-3 py-2 text-left text-xs hover:bg-[#2a3946]"
           onClick={onToggleDeletedMessages}
